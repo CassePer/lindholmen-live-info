@@ -70,7 +70,7 @@ function CameraModal({ camera, onClose }: { camera: Camera; onClose: () => void 
           <h2 className="font-semibold font-display">{camera.name}</h2>
           <p className="text-sm text-muted-foreground">{camera.location}</p>
           <p className="text-xs text-muted-foreground mt-1">
-            Uppdaterad: {new Date(camera.updatedAt).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}
+            Uppdaterad: {new Date(camera.updatedAt).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit", hour12: false })}
           </p>
         </div>
       </motion.div>
@@ -134,7 +134,7 @@ export default function CamerasPage() {
                     <div className="p-2.5">
                       <p className="text-sm font-medium truncate font-display">{camera.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {new Date(camera.updatedAt).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}
+                        {new Date(camera.updatedAt).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit", hour12: false })}
                       </p>
                     </div>
                   </CardContent>

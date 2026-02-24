@@ -118,7 +118,7 @@ export default function DeparturesPage() {
   };
 
   const updatedAtStr = dataUpdatedAt
-    ? new Date(dataUpdatedAt).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    ? new Date(dataUpdatedAt).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })
     : null;
 
   return (
