@@ -64,13 +64,12 @@ function formatTime(isoStr: string): string {
   return match ? match[1] : isoStr;
 }
 
-// Lindholmspiren rikshållplats ID
-// From GTFS Sverige 2: "Lindholmen (Göteborg kn)" = 740059410
-// Lindholmspiren is part of the Lindholmen rikshållplats area
-const LINDHOLMSPIREN_AREA_ID = '740059410';
+// Lindholmen rikshållplats ID (GTFS Sverige 2)
+// Verified working with Trafiklab Realtime API
+const LINDHOLMEN_AREA_ID = '740059410';
 
 async function resolveAreaId(_apiKey: string): Promise<string> {
-  return LINDHOLMSPIREN_AREA_ID;
+  return LINDHOLMEN_AREA_ID;
 }
 
 Deno.serve(async (req) => {
