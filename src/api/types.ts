@@ -82,8 +82,9 @@ export interface Camera {
   thumbnailUrl: string;
   fullImageUrl: string;
   updatedAt: string;
+  description?: string;
+  direction?: number;
+  type?: string;
 }
 
-export interface CameraDetail extends Camera {
-  description?: string;
-}
+export interface CameraDetail extends Camera {}
