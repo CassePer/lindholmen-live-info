@@ -2,10 +2,10 @@ import { useState } from "react";
 import { useLunchMenus, useWeeklyMenus } from "@/hooks/use-lunch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExternalLink, Search, AlertCircle } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import type { LunchMenu, WeeklyLunchMenu, DietTag } from "@/api/types";
 
 const TAG_LABELS: Record<DietTag, string> = {
@@ -16,10 +16,10 @@ const TAG_LABELS: Record<DietTag, string> = {
 };
 
 const TAG_COLORS: Record<DietTag, string> = {
-  vegetarisk: "bg-green-600/15 text-green-700 border-green-600/20",
-  vegansk: "bg-emerald-600/15 text-emerald-700 border-emerald-600/20",
-  fisk: "bg-blue-600/15 text-blue-700 border-blue-600/20",
-  kött: "bg-orange-600/15 text-orange-700 border-orange-600/20",
+  vegetarisk: "bg-success/15 text-success border-success/20",
+  vegansk: "bg-success/10 text-success border-success/15",
+  fisk: "bg-ferry/15 text-ferry border-ferry/20",
+  kött: "bg-accent/15 text-accent border-accent/20",
 };
 
 function DishTag({ tag }: { tag: DietTag }) {
@@ -34,7 +34,7 @@ function MenuSkeleton() {
   return (
     <div className="space-y-4">
       {[1, 2, 3].map((i) => (
-        <Card key={i}>
+        <Card key={i} className="glass-card">
           <CardHeader><Skeleton className="h-6 w-48" /></CardHeader>
           <CardContent className="space-y-2">
             <Skeleton className="h-4 w-full" />
@@ -49,16 +49,30 @@ function MenuSkeleton() {
 
 function ErrorState({ message }: { message: string }) {
   return (
-    <div className="flex flex-col items-center gap-3 py-12 text-muted-foreground" role="alert">
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex flex-col items-center gap-3 py-12 text-muted-foreground"
+      role="alert"
+    >
       <AlertCircle className="h-8 w-8" />
       <p className="text-center">{message}</p>
-    </div>
+    </motion.div>
   );
 }
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
 }
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: i * 0.06, duration: 0.35, ease: "easeOut" as const },
+  }),
+};
 
 function TodayView({ search }: { search: string }) {
   const { data, isLoading, error } = useLunchMenus();
@@ -76,24 +90,36 @@ function TodayView({ search }: { search: string }) {
 
   return (
     <div className="space-y-4">
-      {filtered.map((menu) => (
-        <RestaurantCard key={menu.restaurantId} menu={menu} />
-      ))}
+      <AnimatePresence mode="popLayout">
+        {filtered.map((menu, i) => (
+          <motion.div
+            key={menu.restaurantId}
+            custom={i}
+            variants={cardVariants}
+            initial="hidden"
+            animate="visible"
+            exit={{ opacity: 0, scale: 0.95 }}
+            layout
+          >
+            <RestaurantCard menu={menu} />
+          </motion.div>
+        ))}
+      </AnimatePresence>
     </div>
   );
 }
 
 function RestaurantCard({ menu }: { menu: LunchMenu }) {
   return (
-    <Card>
+    <Card className="glass-card hover-scale">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
-          <CardTitle className="text-lg">{menu.restaurantName}</CardTitle>
+          <CardTitle className="text-lg font-display">{menu.restaurantName}</CardTitle>
           <a
             href={menu.websiteUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+            className="flex-shrink-0 text-muted-foreground hover:text-primary transition-colors"
             aria-label={`Besök ${menu.restaurantName}s webbplats`}
           >
             <ExternalLink className="h-4 w-4" />
@@ -133,8 +159,16 @@ function WeekView({ search }: { search: string }) {
 
   return (
     <div className="space-y-6">
-      {filtered.map((menu) => (
-        <WeeklyRestaurantCard key={menu.restaurantId} menu={menu} />
+      {filtered.map((menu, i) => (
+        <motion.div
+          key={menu.restaurantId}
+          custom={i}
+          variants={cardVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          <WeeklyRestaurantCard menu={menu} />
+        </motion.div>
       ))}
     </div>
   );
@@ -142,15 +176,15 @@ function WeekView({ search }: { search: string }) {
 
 function WeeklyRestaurantCard({ menu }: { menu: WeeklyLunchMenu }) {
   return (
-    <Card>
+    <Card className="glass-card">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
-          <CardTitle className="text-lg">{menu.restaurantName}</CardTitle>
+          <CardTitle className="text-lg font-display">{menu.restaurantName}</CardTitle>
           <a
             href={menu.websiteUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+            className="flex-shrink-0 text-muted-foreground hover:text-primary transition-colors"
             aria-label={`Besök ${menu.restaurantName}s webbplats`}
           >
             <ExternalLink className="h-4 w-4" />
@@ -160,7 +194,7 @@ function WeeklyRestaurantCard({ menu }: { menu: WeeklyLunchMenu }) {
       <CardContent className="space-y-4">
         {menu.days.map((day) => (
           <div key={day.date}>
-            <h4 className="font-semibold text-sm mb-1">{day.dayName}</h4>
+            <h4 className="font-semibold text-sm mb-1 font-display">{day.dayName}</h4>
             <ul className="space-y-1" aria-label={`Rätter ${day.dayName}`}>
               {day.dishes.map((dish, i) => (
                 <li key={i} className="flex items-start gap-2 text-sm">
@@ -185,9 +219,21 @@ export default function LunchPage() {
   return (
     <main className="flex-1 overflow-auto">
       <div className="container max-w-lg mx-auto px-4 py-6 space-y-4">
-        <h1 className="text-2xl font-bold">Lunch</h1>
+        <motion.h1
+          className="text-2xl font-bold font-display"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.4 }}
+        >
+          Lunch
+        </motion.h1>
 
-        <div className="relative">
+        <motion.div
+          className="relative"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, duration: 0.3 }}
+        >
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Sök restaurang eller rätt..."
@@ -196,7 +242,7 @@ export default function LunchPage() {
             className="pl-10"
             aria-label="Sök bland restauranger"
           />
-        </div>
+        </motion.div>
 
         <Tabs defaultValue="idag">
           <TabsList className="w-full">

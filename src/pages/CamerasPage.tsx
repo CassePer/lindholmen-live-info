@@ -3,13 +3,14 @@ import { useCameras } from "@/hooks/use-cameras";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import type { Camera } from "@/api/types";
 
 function CameraSkeleton() {
   return (
     <div className="grid grid-cols-2 gap-3">
       {[1, 2, 3, 4].map((i) => (
-        <Card key={i}><CardContent className="p-2"><Skeleton className="aspect-[4/3] w-full rounded" /></CardContent></Card>
+        <Card key={i} className="glass-card"><CardContent className="p-2"><Skeleton className="aspect-[4/3] w-full rounded" /></CardContent></Card>
       ))}
     </div>
   );
@@ -25,7 +26,6 @@ function CameraModal({ camera, onClose }: { camera: Camera; onClose: () => void 
 
   useEffect(() => {
     document.addEventListener("keydown", handleKeyDown);
-    // Focus trap: prevent background scroll
     document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
@@ -34,20 +34,27 @@ function CameraModal({ camera, onClose }: { camera: Camera; onClose: () => void 
   }, [handleKeyDown]);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4"
       role="dialog"
       aria-modal="true"
       aria-label={`Kamerabild: ${camera.name}`}
       onClick={onClose}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
     >
-      <div
-        className="relative max-w-3xl w-full bg-card rounded-lg overflow-hidden"
+      <motion.div
+        className="relative max-w-3xl w-full bg-card rounded-xl overflow-hidden shadow-xl border border-border"
         onClick={(e) => e.stopPropagation()}
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        transition={{ type: "spring", stiffness: 400, damping: 30 }}
       >
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 z-10 rounded-full bg-background/80 p-2 hover:bg-background transition-colors"
+          className="absolute top-3 right-3 z-10 rounded-full bg-background/80 backdrop-blur-sm p-2 hover:bg-background transition-colors"
           aria-label="Stäng"
           autoFocus
         >
@@ -60,14 +67,14 @@ function CameraModal({ camera, onClose }: { camera: Camera; onClose: () => void 
           loading="lazy"
         />
         <div className="p-4">
-          <h2 className="font-semibold">{camera.name}</h2>
+          <h2 className="font-semibold font-display">{camera.name}</h2>
           <p className="text-sm text-muted-foreground">{camera.location}</p>
           <p className="text-xs text-muted-foreground mt-1">
             Uppdaterad: {new Date(camera.updatedAt).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}
           </p>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -78,28 +85,45 @@ export default function CamerasPage() {
   return (
     <main className="flex-1 overflow-auto">
       <div className="container max-w-lg mx-auto px-4 py-6 space-y-4">
-        <h1 className="text-2xl font-bold">Kameror</h1>
+        <motion.h1
+          className="text-2xl font-bold font-display"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.4 }}
+        >
+          Kameror
+        </motion.h1>
         <p className="text-sm text-muted-foreground">Trafikkameror i Göteborg</p>
 
         {isLoading && <CameraSkeleton />}
 
         {error && (
-          <div className="flex flex-col items-center gap-3 py-12 text-muted-foreground" role="alert">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col items-center gap-3 py-12 text-muted-foreground"
+            role="alert"
+          >
             <AlertCircle className="h-8 w-8" />
             <p>Kunde inte hämta kamerabilder. Försök igen.</p>
-          </div>
+          </motion.div>
         )}
 
         {data && (
           <div className="grid grid-cols-2 gap-3">
-            {data.map((camera) => (
-              <button
+            {data.map((camera, i) => (
+              <motion.button
                 key={camera.id}
                 onClick={() => setSelected(camera)}
-                className="text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg"
+                className="text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
                 aria-label={`Visa ${camera.name}`}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.06, duration: 0.3 }}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
               >
-                <Card className="overflow-hidden hover:shadow-md transition-shadow">
+                <Card className="overflow-hidden glass-card">
                   <CardContent className="p-0">
                     <img
                       src={camera.thumbnailUrl}
@@ -107,20 +131,22 @@ export default function CamerasPage() {
                       className="aspect-[4/3] w-full object-cover"
                       loading="lazy"
                     />
-                    <div className="p-2">
-                      <p className="text-sm font-medium truncate">{camera.name}</p>
+                    <div className="p-2.5">
+                      <p className="text-sm font-medium truncate font-display">{camera.name}</p>
                       <p className="text-xs text-muted-foreground">
                         {new Date(camera.updatedAt).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}
                       </p>
                     </div>
                   </CardContent>
                 </Card>
-              </button>
+              </motion.button>
             ))}
           </div>
         )}
 
-        {selected && <CameraModal camera={selected} onClose={() => setSelected(null)} />}
+        <AnimatePresence>
+          {selected && <CameraModal camera={selected} onClose={() => setSelected(null)} />}
+        </AnimatePresence>
 
         <p className="text-xs text-muted-foreground text-center pt-4 pb-8">
           Uppdateras var 3:e minut.
