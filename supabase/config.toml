@@ -1,1 +1,4 @@
 project_id = "equmgrsquuqaeymbivhe"
+
+[functions.cameras]
+verify_jwt = false

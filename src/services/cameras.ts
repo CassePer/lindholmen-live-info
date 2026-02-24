@@ -1,10 +1,18 @@
-import { fetchApi } from "@/api/client";
-import type { Camera, CameraDetail } from "@/api/types";
+import { supabase } from "@/integrations/supabase/client";
+import type { Camera } from "@/api/types";
 
 export async function getCameras(): Promise<Camera[]> {
-  return fetchApi<Camera[]>("/api/v1/cameras?area=goteborg");
-}
+  const { data, error } = await supabase.functions.invoke("cameras");
 
-export async function getCameraDetail(id: string): Promise<CameraDetail> {
-  return fetchApi<CameraDetail>(`/api/v1/cameras/${id}`);
+  if (error) {
+    console.error("Edge function error:", error);
+    throw new Error("Kunde inte hämta kamerabilder.");
+  }
+
+  if (data?.error) {
+    console.error("API error:", data.error);
+    throw new Error(data.error.message || "Kunde inte hämta kamerabilder.");
+  }
+
+  return data as Camera[];
 }

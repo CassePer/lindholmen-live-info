@@ -69,6 +69,9 @@ function CameraModal({ camera, onClose }: { camera: Camera; onClose: () => void 
         <div className="p-4">
           <h2 className="font-semibold font-display">{camera.name}</h2>
           <p className="text-sm text-muted-foreground">{camera.location}</p>
+          {camera.description && (
+            <p className="text-sm text-muted-foreground mt-1">{camera.description}</p>
+          )}
           <p className="text-xs text-muted-foreground mt-1">
             Uppdaterad: {new Date(camera.updatedAt).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit", hour12: false })}
           </p>
