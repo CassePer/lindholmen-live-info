@@ -5,8 +5,9 @@ const corsHeaders = {
 
 const TRAFIKLAB_BASE = 'https://realtime-api.trafiklab.se/v1';
 
-// Lindholmspiren area_id – we'll resolve it dynamically on first call and cache
-let cachedAreaId: string | null = null;
+// Two stop IDs to cover both bus/tram and ferry departures at Lindholmen
+const LINDHOLMEN_AREA_ID = '740059410'; // Lindholmen (bus, tram)
+const LINDHOLMSPIREN_AREA_ID = '740059412'; // Lindholmspiren (ferry)
 
 interface TrafiklabDeparture {
   scheduled: string;
@@ -44,7 +45,6 @@ interface TrafiklabResponse {
 }
 
 function mapTransportMode(mode: string, code: number): string {
-  // Trafiklab codes: 100=train, 400=metro, 700=bus, 900=tram, 1000=ferry, 1200=ferry
   if (code === 1000 || code === 1200) return 'Färja';
   if (code === 900) return 'Spårvagn';
   if (code === 700) return 'Buss';
@@ -59,17 +59,50 @@ function mapTransportMode(mode: string, code: number): string {
 }
 
 function formatTime(isoStr: string): string {
-  // "2025-04-01T14:30:00" -> "14:30"
   const match = isoStr.match(/T(\d{2}:\d{2})/);
   return match ? match[1] : isoStr;
 }
 
-// Lindholmen rikshållplats ID (GTFS Sverige 2)
-// Verified working with Trafiklab Realtime API
-const LINDHOLMEN_AREA_ID = '740059410';
+async function fetchDepartures(areaId: string, apiKey: string, time?: string | null): Promise<TrafiklabResponse | null> {
+  let url = `${TRAFIKLAB_BASE}/departures/${areaId}`;
+  if (time) url += `/${time}`;
+  url += `?key=${apiKey}`;
 
-async function resolveAreaId(_apiKey: string): Promise<string> {
-  return LINDHOLMEN_AREA_ID;
+  console.log('Fetching departures from:', url.replace(apiKey, '***'));
+  const res = await fetch(url);
+  if (!res.ok) {
+    console.error(`Departures error for ${areaId}:`, res.status);
+    return null;
+  }
+  return await res.json();
+}
+
+function mapDepartures(data: TrafiklabResponse): {
+  id: string;
+  line: string;
+  destination: string;
+  scheduledTime: string;
+  estimatedTime?: string;
+  delayMinutes: number;
+  isRealtime: boolean;
+  transportType: string;
+  scheduledIso: string;
+  realtimeIso?: string;
+}[] {
+  return (data.departures || [])
+    .filter((d) => !d.canceled)
+    .map((d, i) => ({
+      id: `${d.trip?.trip_id || i}-${d.scheduled}`,
+      line: d.route.designation,
+      destination: d.route.direction || d.route.destination?.name || '',
+      scheduledTime: formatTime(d.scheduled),
+      estimatedTime: d.realtime ? formatTime(d.realtime) : undefined,
+      delayMinutes: d.delay || 0,
+      isRealtime: d.is_realtime ?? false,
+      transportType: mapTransportMode(d.route.transport_mode, d.route.transport_mode_code),
+      scheduledIso: d.scheduled,
+      realtimeIso: d.realtime,
+    }));
 }
 
 Deno.serve(async (req) => {
@@ -86,55 +119,46 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Parse optional time parameter from query string
     const url = new URL(req.url);
-    const time = url.searchParams.get('time'); // YYYY-MM-DDTHH:mm format
+    const time = url.searchParams.get('time');
 
-    const areaId = await resolveAreaId(apiKey);
+    // Fetch departures from both Lindholmen (bus/tram) and Lindholmspiren (ferry) in parallel
+    const results = await Promise.all([
+      fetchDepartures(LINDHOLMEN_AREA_ID, apiKey, time),
+      fetchDepartures(LINDHOLMSPIREN_AREA_ID, apiKey, time),
+    ]);
 
-    // Build Trafiklab URL
-    let trafiklabUrl = `${TRAFIKLAB_BASE}/departures/${areaId}`;
-    if (time) {
-      trafiklabUrl += `/${time}`;
+    
+
+    // Merge departures from all stops
+    let allDepartures: ReturnType<typeof mapDepartures> = [];
+    let timestamp = new Date().toISOString();
+    let stopName = 'Lindholmen';
+
+    for (const data of results) {
+      if (data) {
+        allDepartures = allDepartures.concat(mapDepartures(data));
+        timestamp = data.timestamp || timestamp;
+        if (data.stops?.[0]?.name) {
+          stopName = 'Lindholmen & Lindholmspiren';
+        }
+      }
     }
-    trafiklabUrl += `?key=${apiKey}`;
 
-    console.log('Fetching departures from:', trafiklabUrl.replace(apiKey, '***'));
-
-    const response = await fetch(trafiklabUrl);
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error('Trafiklab API error:', response.status, errText);
-      return new Response(
-        JSON.stringify({ error: { code: `TRAFIKLAB_${response.status}`, message: 'Kunde inte hämta avgångar från Trafiklab.' } }),
-        { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const data: TrafiklabResponse = await response.json();
-
-    // Transform to our API contract format
-    const departures = (data.departures || [])
-      .filter((d) => !d.canceled)
-      .map((d, i) => ({
-        id: `${d.trip?.trip_id || i}-${d.scheduled}`,
-        line: d.route.designation,
-        destination: d.route.direction || d.route.destination?.name || '',
-        scheduledTime: formatTime(d.scheduled),
-        estimatedTime: d.realtime ? formatTime(d.realtime) : undefined,
-        delayMinutes: d.delay || 0,
-        isRealtime: d.is_realtime ?? false,
-        transportType: mapTransportMode(d.route.transport_mode, d.route.transport_mode_code),
-        scheduledIso: d.scheduled,
-        realtimeIso: d.realtime,
-      }));
+    // Sort by scheduled time and deduplicate
+    allDepartures.sort((a, b) => a.scheduledIso.localeCompare(b.scheduledIso));
+    const seen = new Set<string>();
+    allDepartures = allDepartures.filter((d) => {
+      if (seen.has(d.id)) return false;
+      seen.add(d.id);
+      return true;
+    });
 
     const result = {
-      departures,
-      updatedAt: data.timestamp || new Date().toISOString(),
-      areaId,
-      stopName: data.stops?.[0]?.name || 'Lindholmspiren',
+      departures: allDepartures,
+      updatedAt: timestamp,
+      areaId: LINDHOLMEN_AREA_ID,
+      stopName,
     };
 
     return new Response(JSON.stringify(result), {
