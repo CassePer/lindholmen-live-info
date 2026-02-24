@@ -1,73 +1,68 @@
-# Welcome to your Lovable project
+# Lindholmen Live
 
-## Project info
+A mobile-first Swedish-language SPA showing lunch menus, live departures, and traffic cameras for the Lindholmen/Gothenburg area.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Tech Stack
 
-## How can I edit this code?
+- **React** + **TypeScript** + **Vite**
+- **Tailwind CSS** + **shadcn/ui**
+- **TanStack Query** for data fetching
 
-There are several ways of editing your application.
+## Getting Started
 
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
+npm install
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+The app starts in **mock mode** by default — no backend needed.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Environment Variables
 
-**Use GitHub Codespaces**
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VITE_API_BASE_URL` | `""` | Base URL for the API (e.g. `https://api.lindholmen.live`) |
+| `VITE_USE_MOCKS` | `true` | Enable mock mode (set to `false` to use real backend) |
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Architecture
 
-## What technologies are used for this project?
+```
+src/
+├── api/           # API client (only place fetch() is called)
+│   ├── client.ts  # fetchApi() wrapper
+│   ├── types.ts   # Shared TypeScript types
+│   └── mocks/     # Mock data & handler
+├── services/      # Business logic consuming API client
+├── hooks/         # React hooks for UI consumption
+├── auth/          # Auth placeholder (future-proofed)
+├── pages/         # Page components
+├── components/    # UI components
+└── lib/           # Utilities & error handling
+```
 
-This project is built with:
+### API Abstraction
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+All API calls go through `fetchApi()` in `src/api/client.ts`. No component or service calls `fetch()` directly.
 
-## How can I deploy this project?
+### Swapping the Backend
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+1. Set `VITE_USE_MOCKS=false`
+2. Set `VITE_API_BASE_URL` to your backend URL (e.g. `https://api.lindholmen.live`)
+3. Implement the endpoints described in [`API_CONTRACT.md`](./API_CONTRACT.md)
+4. No frontend code changes required
 
-## Can I connect a custom domain to my Lovable project?
+### API Versioning
 
-Yes, you can!
+All endpoints are versioned under `/api/v1/`. When breaking changes are introduced, a new version (`/api/v2/`) will be added alongside the old one.
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## Features
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- **Lunch**: Daily & weekly menus with search and diet tags
+- **Departures**: Live transit departures from Lindholmspiren (auto-refresh 30s)
+- **Cameras**: Traffic camera grid with modal view (auto-refresh 3 min)
+
+## Security
+
+- No API keys in the frontend bundle
+- All lunch content rendered as plain text (no HTML injection)
+- Auth module supports bearer tokens but no login required initially
