@@ -1,0 +1,84 @@
+// Shared API types – the contract between frontend and backend
+
+export interface ApiError {
+  error: {
+    code: string;
+    message: string;
+  };
+}
+
+// ── Lunch ──
+
+export interface Restaurant {
+  id: string;
+  name: string;
+  websiteUrl: string;
+  address?: string;
+  tags?: DietTag[];
+}
+
+export type DietTag = "vegetarisk" | "vegansk" | "fisk" | "kött";
+
+export interface LunchDish {
+  name: string;
+  tags?: DietTag[];
+}
+
+export interface LunchMenu {
+  restaurantId: string;
+  restaurantName: string;
+  websiteUrl: string;
+  date: string; // YYYY-MM-DD
+  dishes: LunchDish[];
+  sourceUrl: string;
+  updatedAt: string; // ISO 8601
+}
+
+export interface WeeklyLunchMenu {
+  restaurantId: string;
+  restaurantName: string;
+  websiteUrl: string;
+  week: string; // YYYY-WW
+  days: {
+    date: string;
+    dayName: string;
+    dishes: LunchDish[];
+  }[];
+  sourceUrl: string;
+  updatedAt: string;
+}
+
+// ── Departures ──
+
+export type TransportType = "Färja" | "Spårvagn" | "Buss";
+
+export interface Departure {
+  id: string;
+  line: string;
+  destination: string;
+  scheduledTime: string; // HH:mm
+  estimatedTime?: string; // HH:mm
+  delayMinutes: number;
+  isRealtime: boolean;
+  transportType: TransportType;
+}
+
+export interface DeparturesResponse {
+  departures: Departure[];
+  updatedAt: string;
+}
+
+// ── Cameras ──
+
+export interface Camera {
+  id: string;
+  name: string;
+  location: string;
+  thumbnailUrl: string;
+  fullImageUrl: string;
+  updatedAt: string;
+}
+
+export interface CameraDetail extends Camera {
+  description?: string;
+}
