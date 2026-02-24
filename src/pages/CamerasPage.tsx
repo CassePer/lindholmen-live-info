@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useCameras } from "@/hooks/use-cameras";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, X } from "lucide-react";
+import { AlertCircle, ExternalLink, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Camera } from "@/api/types";
 
@@ -60,21 +60,38 @@ function CameraModal({ camera, onClose }: { camera: Camera; onClose: () => void 
         >
           <X className="h-5 w-5" />
         </button>
-        <img
-          src={camera.fullImageUrl}
-          alt={`Trafikamera: ${camera.name}`}
-          className="w-full"
-          loading="lazy"
-        />
+        <a
+          href={camera.fullImageUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block"
+        >
+          <img
+            src={camera.fullImageUrl}
+            alt={`Trafikamera: ${camera.name}`}
+            className="w-full cursor-pointer"
+            loading="lazy"
+          />
+        </a>
         <div className="p-4">
           <h2 className="font-semibold font-display">{camera.name}</h2>
           <p className="text-sm text-muted-foreground">{camera.location}</p>
           {camera.description && (
             <p className="text-sm text-muted-foreground mt-1">{camera.description}</p>
           )}
-          <p className="text-xs text-muted-foreground mt-1">
-            Uppdaterad: {new Date(camera.updatedAt).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit", hour12: false })}
-          </p>
+          <div className="flex items-center justify-between mt-2">
+            <p className="text-xs text-muted-foreground">
+              Uppdaterad: {new Date(camera.updatedAt).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit", hour12: false })}
+            </p>
+            <a
+              href={camera.fullImageUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+            >
+              Öppna live-bild <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
         </div>
       </motion.div>
     </motion.div>
