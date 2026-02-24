@@ -28,6 +28,7 @@ export interface LunchMenu {
   restaurantId: string;
   restaurantName: string;
   websiteUrl: string;
+  address?: string;
   date: string; // YYYY-MM-DD
   dishes: LunchDish[];
   sourceUrl: string;

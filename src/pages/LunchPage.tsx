@@ -4,7 +4,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ExternalLink, Search, AlertCircle } from "lucide-react";
+import { ExternalLink, Search, AlertCircle, MapPin } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { LunchMenu, WeeklyLunchMenu, DietTag } from "@/api/types";
 
@@ -110,11 +110,29 @@ function TodayView({ search }: { search: string }) {
 }
 
 function RestaurantCard({ menu }: { menu: LunchMenu }) {
+  const mapsUrl = menu.address
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(menu.address)}`
+    : undefined;
+
   return (
     <Card className="glass-card hover-scale">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
-          <CardTitle className="text-lg font-display">{menu.restaurantName}</CardTitle>
+          <div className="space-y-1">
+            <CardTitle className="text-lg font-display">{menu.restaurantName}</CardTitle>
+            {menu.address && mapsUrl && (
+              <a
+                href={mapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                aria-label={`Visa ${menu.restaurantName} på karta`}
+              >
+                <MapPin className="h-3 w-3" />
+                {menu.address}
+              </a>
+            )}
+          </div>
           <a
             href={menu.websiteUrl}
             target="_blank"
