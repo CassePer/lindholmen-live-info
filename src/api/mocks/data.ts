@@ -14,72 +14,24 @@ const weekStr = `${format(today, "yyyy")}-W${String(getISOWeek(today)).padStart(
 const now = new Date().toISOString();
 
 export const restaurants: Restaurant[] = [
-  { id: "1", name: "Kårrestaurangen", websiteUrl: "https://kar.chalmers.se", address: "Chalmersplatsen 1, Göteborg", tags: ["vegetarisk", "kött"] },
-  { id: "2", name: "Lindholmen Street Food", websiteUrl: "https://lindholmenstreetfood.se", address: "Lindholmspiren 3, Göteborg", tags: ["vegansk", "kött"] },
-  { id: "3", name: "Miillo", websiteUrl: "https://miillo.se", address: "Lindholmspiren 5, Göteborg", tags: ["fisk", "kött"] },
-  { id: "4", name: "Kooperativet", websiteUrl: "https://kooperativet.se", address: "Lindholmsallén 10, Göteborg", tags: ["vegetarisk", "vegansk"] },
-  { id: "5", name: "Ocean", websiteUrl: "https://restaurangocean.se", address: "Lindholmspiren 3, Göteborg", tags: ["fisk"] },
-  { id: "6", name: "Benne Pasta Bar", websiteUrl: "https://bennepastabar.se", address: "Lindholmspiren 3, Göteborg", tags: ["vegetarisk", "kött"] },
-  { id: "7", name: "Hey Stansen", websiteUrl: "https://heystansen.se", address: "Lindholmspiren 5, Göteborg", tags: ["vegetarisk", "kött"] },
-  { id: "8", name: "Ciao Lindholmen", websiteUrl: "https://www.ciao.se", address: "Lindholmspiren 3, Göteborg", tags: ["vegetarisk", "kött"] },
-  { id: "9", name: "Birger Bar & Matsal", websiteUrl: "https://birgerbar.se", address: "Lindholmspiren 3, Göteborg", tags: ["fisk", "kött"] },
-  { id: "10", name: "L's Kitchen", websiteUrl: "https://lskitchen.se", address: "Lindholmspiren 5, Göteborg", tags: ["vegetarisk", "kött"] },
+  { id: "1", name: "Benne Pasta Bar", websiteUrl: "https://bennepastabar.se", address: "Lindholmsallén 10, Göteborg", tags: ["vegetarisk", "kött"] },
+  { id: "2", name: "Bistrot", websiteUrl: "https://bistrot.se", address: "Diagonalen 8, Göteborg", tags: ["vegetarisk", "kött"] },
+  { id: "3", name: "Bombay Bistro", websiteUrl: "https://bombaybistrot.se", address: "Lindholmspiren 3, Göteborg", tags: ["vegetarisk", "kött"] },
+  { id: "4", name: "Caffè la Torre", websiteUrl: "https://www.lindholmen.se/en/caffe-la-torre", address: "Lindholmshamnen 42, Göteborg", tags: ["vegetarisk", "kött"] },
+  { id: "5", name: "Dunder Döner", websiteUrl: "https://www.lindholmen.se/en/dunder-doner", address: "Lindholmspiren 3, Göteborg", tags: ["kött", "vegetarisk"] },
+  { id: "6", name: "Kooperativet", websiteUrl: "https://kooperativet.se", address: "Lindholmsallén 10, Göteborg", tags: ["vegetarisk", "vegansk"] },
+  { id: "7", name: "Mimolett", websiteUrl: "https://mimolett.se", address: "Lindholmsallén 10, Göteborg", tags: ["fisk", "kött"] },
+  { id: "8", name: "Piazzarella", websiteUrl: "https://www.lindholmen.se/en/piazzarella", address: "Lindholmspiren 3, Göteborg", tags: ["vegetarisk", "kött"] },
+  { id: "9", name: "Pier 11", websiteUrl: "https://pier11.se", address: "Lindholmspiren 11, Göteborg", tags: ["fisk", "kött"] },
+  { id: "10", name: "Subway Lindholmen", websiteUrl: "https://subway.se", address: "Lindholmspiren 3, Göteborg", tags: ["vegetarisk", "kött"] },
   { id: "11", name: "Tai", websiteUrl: "https://www.facebook.com/TaiLindholmen", address: "Lindholmspiren 3, Göteborg", tags: ["vegetarisk", "kött"] },
   { id: "12", name: "Tandoori Masala", websiteUrl: "https://tandoorimasala.se", address: "Lindholmspiren 3, Göteborg", tags: ["vegetarisk", "kött"] },
-  { id: "13", name: "Jinx Food Truck", websiteUrl: "https://jinxfoodtruck.se", address: "Lindholmspiren, Göteborg", tags: ["kött"] },
-  { id: "14", name: "Subway Lindholmen", websiteUrl: "https://subway.se", address: "Lindholmspiren 3, Göteborg", tags: ["vegetarisk", "kött"] },
-  { id: "15", name: "Poke & Bowl", websiteUrl: "https://pokebowl.se", address: "Lindholmspiren 3, Göteborg", tags: ["fisk", "vegansk"] },
-  { id: "16", name: "Uni3", websiteUrl: "https://uni3.se", address: "Lindholmspiren 5, Göteborg", tags: ["vegetarisk", "kött"] },
-  { id: "17", name: "Mimolett", websiteUrl: "https://mimolett.se", address: "Lindholmsallén 10, Göteborg", tags: ["fisk", "kött"] },
-  { id: "18", name: "Pier 11", websiteUrl: "https://pier11.se", address: "Lindholmspiren 11, Göteborg", tags: ["fisk", "kött"] },
-  { id: "19", name: "Bistrot", websiteUrl: "https://bistrot.se", address: "Lindholmspiren 3, Göteborg", tags: ["vegetarisk", "kött"] },
-  { id: "20", name: "Bombay Bistrot", websiteUrl: "https://bombaybistrot.se", address: "Lindholmspiren 3, Göteborg", tags: ["vegetarisk", "kött"] },
+  { id: "13", name: "Uni3", websiteUrl: "https://uni3.se", address: "Lindholmspiren 5, Göteborg", tags: ["vegetarisk", "kött"] },
 ];
 
 export const lunchMenus: LunchMenu[] = [
   {
-    restaurantId: "1", restaurantName: "Kårrestaurangen", websiteUrl: "https://kar.chalmers.se", address: "Chalmersplatsen 1, Göteborg", date: todayStr,
-    dishes: [
-      { name: "Stekt kycklingfilé med rostad potatis och bearnaisesås", tags: ["kött"] },
-      { name: "Vegetarisk lasagne med grönsaksfyllning", tags: ["vegetarisk"] },
-      { name: "Pannbiff med gräddsås, lingon och kokt potatis", tags: ["kött"] },
-    ],
-    sourceUrl: "https://kar.chalmers.se/lunch", updatedAt: now,
-  },
-  {
-    restaurantId: "2", restaurantName: "Lindholmen Street Food", websiteUrl: "https://lindholmenstreetfood.se", address: "Lindholmspiren 3, Göteborg", date: todayStr,
-    dishes: [
-      { name: "Pulled pork bowl med coleslaw och majskolv", tags: ["kött"] },
-      { name: "Vegansk tikka masala med ris", tags: ["vegansk"] },
-    ],
-    sourceUrl: "https://lindholmenstreetfood.se/meny", updatedAt: now,
-  },
-  {
-    restaurantId: "3", restaurantName: "Miillo", websiteUrl: "https://miillo.se", address: "Lindholmspiren 5, Göteborg", date: todayStr,
-    dishes: [
-      { name: "Pasta med räkor, vitlök och chili", tags: ["fisk"] },
-      { name: "Grillad entrecôte med pommes frites", tags: ["kött"] },
-    ],
-    sourceUrl: "https://miillo.se/lunch", updatedAt: now,
-  },
-  {
-    restaurantId: "4", restaurantName: "Kooperativet", websiteUrl: "https://kooperativet.se", address: "Lindholmsallén 10, Göteborg", date: todayStr,
-    dishes: [
-      { name: "Halloumiburgare med sötpotatispommes", tags: ["vegetarisk"] },
-      { name: "Vegansk poke bowl med tofu och edamame", tags: ["vegansk"] },
-    ],
-    sourceUrl: "https://kooperativet.se/meny", updatedAt: now,
-  },
-  {
-    restaurantId: "5", restaurantName: "Ocean", websiteUrl: "https://restaurangocean.se", address: "Lindholmspiren 3, Göteborg", date: todayStr,
-    dishes: [
-      { name: "Stekt torskfilé med äggsås och kokt potatis", tags: ["fisk"] },
-      { name: "Laxpudding med dill- och citronsås", tags: ["fisk"] },
-    ],
-    sourceUrl: "https://restaurangocean.se/lunch", updatedAt: now,
-  },
-  {
-    restaurantId: "6", restaurantName: "Benne Pasta Bar", websiteUrl: "https://bennepastabar.se", address: "Lindholmspiren 3, Göteborg", date: todayStr,
+    restaurantId: "1", restaurantName: "Benne Pasta Bar", websiteUrl: "https://bennepastabar.se", address: "Lindholmsallén 10, Göteborg", date: todayStr,
     dishes: [
       { name: "Tagliatelle med svamp och tryffelolja", tags: ["vegetarisk"] },
       { name: "Spaghetti carbonara", tags: ["kött"] },
@@ -87,37 +39,76 @@ export const lunchMenus: LunchMenu[] = [
     sourceUrl: "https://bennepastabar.se/meny", updatedAt: now,
   },
   {
-    restaurantId: "7", restaurantName: "Hey Stansen", websiteUrl: "https://heystansen.se", address: "Lindholmspiren 5, Göteborg", date: todayStr,
+    restaurantId: "2", restaurantName: "Bistrot", websiteUrl: "https://bistrot.se", address: "Diagonalen 8, Göteborg", date: todayStr,
     dishes: [
-      { name: "Fish & chips med remoulad", tags: ["fisk"] },
-      { name: "BBQ-burger med cheddar och coleslaw", tags: ["kött"] },
-      { name: "Grönsakswrap med hummus", tags: ["vegetarisk"] },
+      { name: "Caesarsallad med kyckling och bacon", tags: ["kött"] },
+      { name: "Veckans lasagne med rucola och grana padano", tags: ["kött"] },
     ],
-    sourceUrl: "https://heystansen.se/lunch", updatedAt: now,
+    sourceUrl: "https://bistrot.se", updatedAt: now,
   },
   {
-    restaurantId: "8", restaurantName: "Ciao Lindholmen", websiteUrl: "https://www.ciao.se", address: "Lindholmspiren 3, Göteborg", date: todayStr,
+    restaurantId: "3", restaurantName: "Bombay Bistro", websiteUrl: "https://bombaybistrot.se", address: "Lindholmspiren 3, Göteborg", date: todayStr,
+    dishes: [
+      { name: "Butter chicken med naanbröd och ris", tags: ["kött"] },
+      { name: "Chana masala med raita", tags: ["vegetarisk"] },
+    ],
+    sourceUrl: "https://bombaybistrot.se/lunch", updatedAt: now,
+  },
+  {
+    restaurantId: "4", restaurantName: "Caffè la Torre", websiteUrl: "https://www.lindholmen.se/en/caffe-la-torre", address: "Lindholmshamnen 42, Göteborg", date: todayStr,
+    dishes: [
+      { name: "Panini med mozzarella, tomat och pesto", tags: ["vegetarisk"] },
+      { name: "Pasta bolognese", tags: ["kött"] },
+    ],
+    sourceUrl: "https://www.lindholmen.se/en/caffe-la-torre", updatedAt: now,
+  },
+  {
+    restaurantId: "5", restaurantName: "Dunder Döner", websiteUrl: "https://www.lindholmen.se/en/dunder-doner", address: "Lindholmspiren 3, Göteborg", date: todayStr,
+    dishes: [
+      { name: "Döner kebab med sallad och vitlökssås", tags: ["kött"] },
+      { name: "Falafel wrap med hummus", tags: ["vegetarisk"] },
+    ],
+    sourceUrl: "https://www.lindholmen.se/en/dunder-doner", updatedAt: now,
+  },
+  {
+    restaurantId: "6", restaurantName: "Kooperativet", websiteUrl: "https://kooperativet.se", address: "Lindholmsallén 10, Göteborg", date: todayStr,
+    dishes: [
+      { name: "Halloumiburgare med sötpotatispommes", tags: ["vegetarisk"] },
+      { name: "Vegansk poke bowl med tofu och edamame", tags: ["vegansk"] },
+    ],
+    sourceUrl: "https://kooperativet.se/meny", updatedAt: now,
+  },
+  {
+    restaurantId: "7", restaurantName: "Mimolett", websiteUrl: "https://mimolett.se", address: "Lindholmsallén 10, Göteborg", date: todayStr,
+    dishes: [
+      { name: "Pocherad torsk med brynt smör och kapris", tags: ["fisk"] },
+      { name: "Oxfilé med rödvinssås och potatisgratäng", tags: ["kött"] },
+    ],
+    sourceUrl: "https://mimolett.se/lunch", updatedAt: now,
+  },
+  {
+    restaurantId: "8", restaurantName: "Piazzarella", websiteUrl: "https://www.lindholmen.se/en/piazzarella", address: "Lindholmspiren 3, Göteborg", date: todayStr,
     dishes: [
       { name: "Pizza Margherita", tags: ["vegetarisk"] },
       { name: "Pizza med skinka och svamp", tags: ["kött"] },
     ],
-    sourceUrl: "https://www.ciao.se/meny", updatedAt: now,
+    sourceUrl: "https://www.lindholmen.se/en/piazzarella", updatedAt: now,
   },
   {
-    restaurantId: "9", restaurantName: "Birger Bar & Matsal", websiteUrl: "https://birgerbar.se", address: "Lindholmspiren 3, Göteborg", date: todayStr,
+    restaurantId: "9", restaurantName: "Pier 11", websiteUrl: "https://pier11.se", address: "Lindholmspiren 11, Göteborg", date: todayStr,
     dishes: [
-      { name: "Grillad lax med citronrisotto", tags: ["fisk"] },
-      { name: "Entrecôte med rödvinssky och gratäng", tags: ["kött"] },
+      { name: "Fish & chips med tartarsås", tags: ["fisk"] },
+      { name: "Grillad lammkotlett med rosmarin", tags: ["kött"] },
     ],
-    sourceUrl: "https://birgerbar.se/lunch", updatedAt: now,
+    sourceUrl: "https://pier11.se/lunch", updatedAt: now,
   },
   {
-    restaurantId: "10", restaurantName: "L's Kitchen", websiteUrl: "https://lskitchen.se", address: "Lindholmspiren 5, Göteborg", date: todayStr,
+    restaurantId: "10", restaurantName: "Subway Lindholmen", websiteUrl: "https://subway.se", address: "Lindholmspiren 3, Göteborg", date: todayStr,
     dishes: [
-      { name: "Bibimbap med kyckling och grönsaker", tags: ["kött"] },
-      { name: "Vegetarisk bibimbap med tofu", tags: ["vegetarisk"] },
+      { name: "Sub of the Day – Italian B.M.T.", tags: ["kött"] },
+      { name: "Veggie Delite", tags: ["vegetarisk"] },
     ],
-    sourceUrl: "https://lskitchen.se/lunch", updatedAt: now,
+    sourceUrl: "https://subway.se", updatedAt: now,
   },
   {
     restaurantId: "11", restaurantName: "Tai", websiteUrl: "https://www.facebook.com/TaiLindholmen", address: "Lindholmspiren 3, Göteborg", date: todayStr,
@@ -136,67 +127,12 @@ export const lunchMenus: LunchMenu[] = [
     sourceUrl: "https://tandoorimasala.se/meny", updatedAt: now,
   },
   {
-    restaurantId: "13", restaurantName: "Jinx Food Truck", websiteUrl: "https://jinxfoodtruck.se", address: "Lindholmspiren, Göteborg", date: todayStr,
-    dishes: [
-      { name: "Smash burger med picklad lök och tryffelmajonnäs", tags: ["kött"] },
-    ],
-    sourceUrl: "https://jinxfoodtruck.se", updatedAt: now,
-  },
-  {
-    restaurantId: "14", restaurantName: "Subway Lindholmen", websiteUrl: "https://subway.se", address: "Lindholmspiren 3, Göteborg", date: todayStr,
-    dishes: [
-      { name: "Sub of the Day – Italian B.M.T.", tags: ["kött"] },
-      { name: "Veggie Delite", tags: ["vegetarisk"] },
-    ],
-    sourceUrl: "https://subway.se", updatedAt: now,
-  },
-  {
-    restaurantId: "15", restaurantName: "Poke & Bowl", websiteUrl: "https://pokebowl.se", address: "Lindholmspiren 3, Göteborg", date: todayStr,
-    dishes: [
-      { name: "Laxpoke med avokado och edamame", tags: ["fisk"] },
-      { name: "Vegansk poke med mango och tofu", tags: ["vegansk"] },
-    ],
-    sourceUrl: "https://pokebowl.se/meny", updatedAt: now,
-  },
-  {
-    restaurantId: "16", restaurantName: "Uni3", websiteUrl: "https://uni3.se", address: "Lindholmspiren 5, Göteborg", date: todayStr,
+    restaurantId: "13", restaurantName: "Uni3", websiteUrl: "https://uni3.se", address: "Lindholmspiren 5, Göteborg", date: todayStr,
     dishes: [
       { name: "Grillad kyckling med rostad potatis och örtsås", tags: ["kött"] },
       { name: "Vegetarisk buddha bowl med quinoa", tags: ["vegetarisk"] },
     ],
     sourceUrl: "https://uni3.se/lunch", updatedAt: now,
-  },
-  {
-    restaurantId: "17", restaurantName: "Mimolett", websiteUrl: "https://mimolett.se", address: "Lindholmsallén 10, Göteborg", date: todayStr,
-    dishes: [
-      { name: "Pocherad torsk med brynt smör och kapris", tags: ["fisk"] },
-      { name: "Oxfilé med rödvinssås och potatisgratäng", tags: ["kött"] },
-    ],
-    sourceUrl: "https://mimolett.se/lunch", updatedAt: now,
-  },
-  {
-    restaurantId: "18", restaurantName: "Pier 11", websiteUrl: "https://pier11.se", address: "Lindholmspiren 11, Göteborg", date: todayStr,
-    dishes: [
-      { name: "Fish & chips med tartarsås", tags: ["fisk"] },
-      { name: "Grillad lammkotlett med rosmarin", tags: ["kött"] },
-    ],
-    sourceUrl: "https://pier11.se/lunch", updatedAt: now,
-  },
-  {
-    restaurantId: "19", restaurantName: "Bistrot", websiteUrl: "https://bistrot.se", address: "Lindholmspiren 3, Göteborg", date: todayStr,
-    dishes: [
-      { name: "Croque monsieur med sallad", tags: ["kött"] },
-      { name: "Quiche lorraine med ratatouille", tags: ["vegetarisk"] },
-    ],
-    sourceUrl: "https://bistrot.se/lunch", updatedAt: now,
-  },
-  {
-    restaurantId: "20", restaurantName: "Bombay Bistrot", websiteUrl: "https://bombaybistrot.se", address: "Lindholmspiren 3, Göteborg", date: todayStr,
-    dishes: [
-      { name: "Butter chicken med naanbröd och ris", tags: ["kött"] },
-      { name: "Chana masala med raita", tags: ["vegetarisk"] },
-    ],
-    sourceUrl: "https://bombaybistrot.se/lunch", updatedAt: now,
   },
 ];
 
