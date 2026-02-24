@@ -1,10 +1,11 @@
+import { useState } from "react";
 import { useDepartures } from "@/hooks/use-departures";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RefreshCw, AlertCircle, Ship, Train, Bus } from "lucide-react";
-import { motion } from "framer-motion";
+import { RefreshCw, AlertCircle, Ship, Train, Bus, ChevronDown, ChevronUp } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import type { Departure, TransportType } from "@/api/types";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -21,6 +22,8 @@ const TRANSPORT_COLORS: Record<TransportType, string> = {
   Spårvagn: "bg-tram text-primary-foreground",
   Buss: "bg-bus text-primary-foreground",
 };
+
+const INITIAL_VISIBLE = 5;
 
 function DepartureSkeleton() {
   return (
@@ -41,7 +44,7 @@ function DepartureSkeleton() {
 function DepartureRow({ dep, index }: { dep: Departure; index: number }) {
   const time = dep.estimatedTime ?? dep.scheduledTime;
   const hasDelay = dep.delayMinutes > 0;
-  const colorClass = TRANSPORT_COLORS[dep.transportType];
+  const colorClass = TRANSPORT_COLORS[dep.transportType] ?? "bg-muted text-muted-foreground";
 
   return (
     <motion.div
@@ -74,37 +77,86 @@ function DepartureRow({ dep, index }: { dep: Departure; index: number }) {
 }
 
 function GroupedDepartures({ departures }: { departures: Departure[] }) {
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+
   const grouped = TRANSPORT_ORDER.map((type) => ({
     type,
     items: departures.filter((d) => d.transportType === type),
   })).filter((g) => g.items.length > 0);
 
+  // Also include transport types not in TRANSPORT_ORDER (e.g. "Tåg")
+  const knownTypes = new Set(TRANSPORT_ORDER);
+  const extraGroups = [...new Set(departures.map(d => d.transportType))]
+    .filter(t => !knownTypes.has(t))
+    .map(type => ({
+      type,
+      items: departures.filter(d => d.transportType === type),
+    }))
+    .filter(g => g.items.length > 0);
+
+  const allGroups = [...grouped, ...extraGroups];
+
+  const toggleGroup = (type: string) => {
+    setExpandedGroups((prev) => ({ ...prev, [type]: !prev[type] }));
+  };
+
   return (
     <div className="space-y-4">
-      {grouped.map((group, gi) => (
-        <motion.div
-          key={group.type}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: gi * 0.1, duration: 0.35 }}
-        >
-          <Card className="glass-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2 font-display">
-                {TRANSPORT_ICON[group.type]}
-                {group.type}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div role="list" aria-label={`Avgångar med ${group.type}`}>
-                {group.items.map((dep, i) => (
-                  <DepartureRow key={dep.id} dep={dep} index={i} />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      ))}
+      {allGroups.map((group, gi) => {
+        const isExpanded = expandedGroups[group.type] ?? false;
+        const visibleItems = isExpanded ? group.items : group.items.slice(0, INITIAL_VISIBLE);
+        const hasMore = group.items.length > INITIAL_VISIBLE;
+
+        return (
+          <motion.div
+            key={group.type}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: gi * 0.1, duration: 0.35 }}
+          >
+            <Card className="glass-card">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2 font-display">
+                  {TRANSPORT_ICON[group.type] ?? <Bus className="h-5 w-5" />}
+                  {group.type}
+                  <span className="text-xs text-muted-foreground font-normal ml-auto">
+                    {group.items.length} avgångar
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div role="list" aria-label={`Avgångar med ${group.type}`}>
+                  <AnimatePresence initial={false}>
+                    {visibleItems.map((dep, i) => (
+                      <DepartureRow key={dep.id} dep={dep} index={i} />
+                    ))}
+                  </AnimatePresence>
+                </div>
+                {hasMore && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full mt-2 text-muted-foreground"
+                    onClick={() => toggleGroup(group.type)}
+                  >
+                    {isExpanded ? (
+                      <>
+                        <ChevronUp className="h-4 w-4 mr-1" />
+                        Visa färre
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-4 w-4 mr-1" />
+                        Visa alla {group.items.length} avgångar
+                      </>
+                    )}
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        );
+      })}
     </div>
   );
 }
@@ -120,6 +172,8 @@ export default function DeparturesPage() {
   const updatedAtStr = dataUpdatedAt
     ? new Date(dataUpdatedAt).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })
     : null;
+
+  const stopName = data?.stopName || "Lindholmspiren";
 
   return (
     <main className="flex-1 overflow-auto">
@@ -145,7 +199,7 @@ export default function DeparturesPage() {
           </motion.div>
         </div>
 
-        <p className="text-sm text-muted-foreground font-medium">Lindholmspiren</p>
+        <p className="text-sm text-muted-foreground font-medium">{stopName}</p>
 
         {updatedAtStr && (
           <p className="text-xs text-muted-foreground">Senast uppdaterad: {updatedAtStr}</p>
@@ -161,14 +215,21 @@ export default function DeparturesPage() {
             role="alert"
           >
             <AlertCircle className="h-8 w-8" />
-            <p>Kunde inte hämta avgångar. Försök igen.</p>
+            <p className="text-center">Kunde inte hämta avgångar. Försök igen.</p>
+            <p className="text-xs text-center max-w-xs">{error instanceof Error ? error.message : ""}</p>
           </motion.div>
         )}
 
-        {data && <GroupedDepartures departures={data.departures} />}
+        {data && data.departures.length === 0 && (
+          <div className="text-center py-12 text-muted-foreground">
+            <p>Inga avgångar hittades just nu.</p>
+          </div>
+        )}
+
+        {data && data.departures.length > 0 && <GroupedDepartures departures={data.departures} />}
 
         <p className="text-xs text-muted-foreground text-center pt-4 pb-8">
-          Uppdateras automatiskt var 30:e sekund.
+          Uppdateras automatiskt var 30:e sekund · Data från Trafiklab.se
         </p>
       </div>
     </main>
