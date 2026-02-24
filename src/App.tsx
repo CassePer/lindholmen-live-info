@@ -8,6 +8,7 @@ import BottomNav from "@/components/BottomNav";
 import LunchPage from "@/pages/LunchPage";
 import DeparturesPage from "@/pages/DeparturesPage";
 import CamerasPage from "@/pages/CamerasPage";
+import InstallPage from "@/pages/InstallPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
               <Route path="/" element={<LunchPage />} />
               <Route path="/avgangar" element={<DeparturesPage />} />
               <Route path="/kameror" element={<CamerasPage />} />
+              <Route path="/install" element={<InstallPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
             <BottomNav />
