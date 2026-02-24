@@ -62,11 +62,15 @@ export interface Departure {
   delayMinutes: number;
   isRealtime: boolean;
   transportType: TransportType;
+  scheduledIso?: string;
+  realtimeIso?: string;
 }
 
 export interface DeparturesResponse {
   departures: Departure[];
   updatedAt: string;
+  areaId?: string;
+  stopName?: string;
 }
 
 // ── Cameras ──
