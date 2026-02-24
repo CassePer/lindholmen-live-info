@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RefreshCw, AlertCircle, Ship, Train, Bus, ChevronDown, ChevronUp } from "lucide-react";
+import { RefreshCw, AlertCircle, Ship, Train, Bus, ChevronDown, ChevronUp, Flag } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Departure, TransportType } from "@/api/types";
 import { useQueryClient } from "@tanstack/react-query";
@@ -56,6 +56,12 @@ function DepartureRow({ dep, index }: { dep: Departure; index: number }) {
       <span className={`font-bold text-sm min-w-[2.5rem] text-center rounded-md px-1.5 py-1 ${colorClass}`}>
         {dep.line}
       </span>
+      {dep.line === "286" && (
+        <Flag className="h-4 w-4 text-success shrink-0" aria-label="Gratisfärja" />
+      )}
+      {dep.line === "285" && (
+        <Flag className="h-4 w-4 text-primary shrink-0" aria-label="Betalfärja" />
+      )}
       <div className="flex-1 min-w-0">
         <p className="text-sm truncate">{dep.destination}</p>
       </div>
