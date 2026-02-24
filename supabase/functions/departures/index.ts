@@ -64,13 +64,13 @@ function formatTime(isoStr: string): string {
   return match ? match[1] : isoStr;
 }
 
-// Lindholmspiren/Lindholmen area_id
-// TODO: Verify this ID when rate limit resets. The Stop Lookup API requires
-// separate activation in the Trafiklab account.
-const LINDHOLMEN_AREA_ID = '740015578';
+// Lindholmspiren rikshållplats ID
+// From GTFS Sverige 2: "Lindholmen (Göteborg kn)" = 740059410
+// Lindholmspiren is part of the Lindholmen rikshållplats area
+const LINDHOLMSPIREN_AREA_ID = '740059410';
 
 async function resolveAreaId(_apiKey: string): Promise<string> {
-  return LINDHOLMEN_AREA_ID;
+  return LINDHOLMSPIREN_AREA_ID;
 }
 
 Deno.serve(async (req) => {
