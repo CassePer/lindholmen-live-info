@@ -10,6 +10,7 @@ import DeparturesPage from "@/pages/DeparturesPage";
 import CamerasPage from "@/pages/CamerasPage";
 import InstallPage from "@/pages/InstallPage";
 import NotFound from "@/pages/NotFound";
+import { InstallBanner } from "@/components/InstallBanner";
 
 const queryClient = new QueryClient();
 
@@ -21,6 +22,7 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <div className="flex min-h-svh flex-col">
+            <InstallBanner />
             <Routes>
               <Route path="/" element={<LunchPage />} />
               <Route path="/avgangar" element={<DeparturesPage />} />
