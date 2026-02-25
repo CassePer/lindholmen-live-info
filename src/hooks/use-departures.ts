@@ -5,7 +5,7 @@ export function useDepartures() {
   return useQuery({
     queryKey: ["departures"],
     queryFn: () => getDepartures(),
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
     staleTime: 10_000,
   });
 }
