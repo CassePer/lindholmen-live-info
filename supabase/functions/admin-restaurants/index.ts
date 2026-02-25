@@ -47,6 +47,27 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (req.method === 'PUT' || req.method === 'PATCH') {
+      const body = await req.json();
+      const { id, ...updates } = body;
+      if (!id) {
+        return new Response(JSON.stringify({ error: 'id required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const { data, error } = await supabase
+        .from('restaurants')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return new Response(JSON.stringify(data), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     if (req.method === 'DELETE') {
       const url = new URL(req.url);
       const id = url.searchParams.get('id');

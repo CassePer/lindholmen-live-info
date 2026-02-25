@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useDepartures } from "@/hooks/use-departures";
+import { useAppSettings } from "@/hooks/use-app-settings";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -217,6 +218,8 @@ function GroupedDepartures({ departures }: { departures: Departure[] }) {
 
 export default function DeparturesPage({ embedded }: { embedded?: boolean }) {
   const { data, isLoading, error, dataUpdatedAt } = useDepartures();
+  const { data: settings } = useAppSettings();
+  const intervalSec = settings?.departure_refresh_interval ?? "60";
   const queryClient = useQueryClient();
 
   const handleRefresh = () => {
@@ -283,7 +286,7 @@ export default function DeparturesPage({ embedded }: { embedded?: boolean }) {
 
 
         <p className="text-xs text-muted-foreground text-center pt-2 pb-8">
-          Uppdateras automatiskt var 30:e sekund · Data från Trafiklab.se
+          Uppdateras automatiskt var {intervalSec}:e sekund · Data från Trafiklab.se
         </p>
       </div>
   );

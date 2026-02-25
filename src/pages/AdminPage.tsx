@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Trash2, Plus, ArrowLeft, ExternalLink, RefreshCw } from "lucide-react";
+import { Trash2, Plus, ArrowLeft, ExternalLink, RefreshCw, Pencil, Check, X, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -31,12 +31,111 @@ function useRestaurants() {
   });
 }
 
+function useSettings() {
+  return useQuery<Record<string, string>>({
+    queryKey: ["admin-settings"],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("admin-settings", {
+        method: "GET",
+      });
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+function EditableRestaurantRow({
+  restaurant,
+  onUpdate,
+  onDelete,
+  isDeleting,
+}: {
+  restaurant: Restaurant;
+  onUpdate: (id: string, updates: Partial<Restaurant>) => void;
+  onDelete: (id: string) => void;
+  isDeleting: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(restaurant.name);
+  const [menuUrl, setMenuUrl] = useState(restaurant.menu_url);
+  const [websiteUrl, setWebsiteUrl] = useState(restaurant.website_url);
+
+  const handleSave = () => {
+    onUpdate(restaurant.id, { name, menu_url: menuUrl, website_url: websiteUrl });
+    setEditing(false);
+  };
+
+  const handleCancel = () => {
+    setName(restaurant.name);
+    setMenuUrl(restaurant.menu_url);
+    setWebsiteUrl(restaurant.website_url);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <Card className="glass-card">
+        <CardContent className="py-3 px-4 space-y-2">
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Namn" />
+          <Input value={menuUrl} onChange={(e) => setMenuUrl(e.target.value)} placeholder="Meny-URL" type="url" />
+          <Input value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} placeholder="Webbplats-URL" type="url" />
+          <div className="flex gap-2 justify-end">
+            <Button variant="ghost" size="sm" onClick={handleCancel}>
+              <X className="h-4 w-4 mr-1" /> Avbryt
+            </Button>
+            <Button size="sm" onClick={handleSave} disabled={!name.trim() || !menuUrl.trim()}>
+              <Check className="h-4 w-4 mr-1" /> Spara
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="glass-card">
+      <CardContent className="flex items-center justify-between py-3 px-4">
+        <div className="min-w-0 flex-1">
+          <p className="font-medium truncate">{restaurant.name}</p>
+          <a
+            href={restaurant.menu_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 truncate"
+          >
+            <ExternalLink className="h-3 w-3 flex-shrink-0" />
+            {restaurant.menu_url}
+          </a>
+        </div>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <Button variant="ghost" size="icon" onClick={() => setEditing(true)}>
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-destructive hover:text-destructive"
+            onClick={() => onDelete(restaurant.id)}
+            disabled={isDeleting}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function AdminPage() {
   const queryClient = useQueryClient();
   const { data: restaurants, isLoading } = useRestaurants();
+  const { data: settings } = useSettings();
   const [name, setName] = useState("");
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [menuUrl, setMenuUrl] = useState("");
+  const [refreshInterval, setRefreshInterval] = useState<string | null>(null);
+
+  const currentInterval = refreshInterval ?? settings?.departure_refresh_interval ?? "60";
 
   const addMutation = useMutation({
     mutationFn: async () => {
@@ -55,6 +154,22 @@ export default function AdminPage() {
       toast.success("Restaurang tillagd");
     },
     onError: () => toast.error("Kunde inte lägga till restaurang"),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Restaurant> }) => {
+      const { data, error } = await supabase.functions.invoke("admin-restaurants", {
+        method: "PUT",
+        body: { id, ...updates },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-restaurants"] });
+      toast.success("Restaurang uppdaterad");
+    },
+    onError: () => toast.error("Kunde inte uppdatera restaurang"),
   });
 
   const deleteMutation = useMutation({
@@ -89,6 +204,23 @@ export default function AdminPage() {
     onError: () => toast.error("Kunde inte rensa cachen"),
   });
 
+  const saveSettingsMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("admin-settings", {
+        method: "PUT",
+        body: { key: "departure_refresh_interval", value: currentInterval },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["app-settings"] });
+      toast.success("Inställning sparad");
+    },
+    onError: () => toast.error("Kunde inte spara inställning"),
+  });
+
   const canAdd = name.trim() && menuUrl.trim();
 
   return (
@@ -100,7 +232,47 @@ export default function AdminPage() {
               <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>
-          <h1 className="text-2xl font-bold font-display flex-1">Hantera restauranger</h1>
+          <h1 className="text-2xl font-bold font-display flex-1">Admin</h1>
+        </div>
+
+        {/* Settings */}
+        <Card className="glass-card">
+          <CardHeader>
+            <CardTitle className="text-base font-display flex items-center gap-2">
+              <Settings className="h-4 w-4" /> Inställningar
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <label className="text-sm font-medium mb-1 block">
+                Avgångar – uppdateringsintervall (sekunder)
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  min="10"
+                  max="300"
+                  value={currentInterval}
+                  onChange={(e) => setRefreshInterval(e.target.value)}
+                  className="w-32"
+                />
+                <Button
+                  size="sm"
+                  onClick={() => saveSettingsMutation.mutate()}
+                  disabled={saveSettingsMutation.isPending}
+                >
+                  {saveSettingsMutation.isPending ? "Sparar..." : "Spara"}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Restaurants header */}
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold font-display">
+            Restauranger ({restaurants?.length ?? 0})
+          </h2>
           <Button
             variant="outline"
             size="sm"
@@ -118,28 +290,10 @@ export default function AdminPage() {
             <CardTitle className="text-base font-display">Lägg till restaurang</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Input
-              placeholder="Namn *"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-            <Input
-              placeholder="Webbplats-URL"
-              type="url"
-              value={websiteUrl}
-              onChange={(e) => setWebsiteUrl(e.target.value)}
-            />
-            <Input
-              placeholder="Meny-URL *"
-              type="url"
-              value={menuUrl}
-              onChange={(e) => setMenuUrl(e.target.value)}
-            />
-            <Button
-              onClick={() => addMutation.mutate()}
-              disabled={!canAdd || addMutation.isPending}
-              className="w-full"
-            >
+            <Input placeholder="Namn *" value={name} onChange={(e) => setName(e.target.value)} />
+            <Input placeholder="Webbplats-URL" type="url" value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} />
+            <Input placeholder="Meny-URL *" type="url" value={menuUrl} onChange={(e) => setMenuUrl(e.target.value)} />
+            <Button onClick={() => addMutation.mutate()} disabled={!canAdd || addMutation.isPending} className="w-full">
               <Plus className="h-4 w-4 mr-2" />
               {addMutation.isPending ? "Lägger till..." : "Lägg till"}
             </Button>
@@ -148,9 +302,6 @@ export default function AdminPage() {
 
         {/* Restaurant list */}
         <div className="space-y-3">
-          <h2 className="text-lg font-semibold font-display">
-            Restauranger ({restaurants?.length ?? 0})
-          </h2>
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Laddar...</p>
           ) : (
@@ -163,31 +314,12 @@ export default function AdminPage() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                 >
-                  <Card className="glass-card">
-                    <CardContent className="flex items-center justify-between py-3 px-4">
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium truncate">{r.name}</p>
-                        <a
-                          href={r.menu_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 truncate"
-                        >
-                          <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                          {r.menu_url}
-                        </a>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive hover:text-destructive flex-shrink-0"
-                        onClick={() => deleteMutation.mutate(r.id)}
-                        disabled={deleteMutation.isPending}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </CardContent>
-                  </Card>
+                  <EditableRestaurantRow
+                    restaurant={r}
+                    onUpdate={(id, updates) => updateMutation.mutate({ id, updates })}
+                    onDelete={(id) => deleteMutation.mutate(id)}
+                    isDeleting={deleteMutation.isPending}
+                  />
                 </motion.div>
               ))}
             </AnimatePresence>
