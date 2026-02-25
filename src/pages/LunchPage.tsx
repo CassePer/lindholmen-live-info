@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { useLunchMenus, useWeeklyMenus } from "@/hooks/use-lunch";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { useLunchMenus } from "@/hooks/use-lunch";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ExternalLink, Search, AlertCircle, MapPin } from "lucide-react";
+import { ExternalLink, Search, AlertCircle, MapPin, Settings } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import type { LunchMenu, WeeklyLunchMenu, DietTag } from "@/api/types";
+import { Link } from "react-router-dom";
+import type { LunchMenu, DietTag } from "@/api/types";
 
 const TAG_LABELS: Record<DietTag, string> = {
   vegetarisk: "Vegetarisk",
@@ -74,41 +74,6 @@ const cardVariants = {
   }),
 };
 
-function TodayView({ search }: { search: string }) {
-  const { data, isLoading, error } = useLunchMenus();
-
-  if (isLoading) return <MenuSkeleton />;
-  if (error) return <ErrorState message="Kunde inte hämta dagens menyer. Försök igen senare." />;
-  if (!data?.length) return <ErrorState message="Inga menyer hittades för idag." />;
-
-  const filtered = data.filter((m) =>
-    m.restaurantName.toLowerCase().includes(search.toLowerCase()) ||
-    m.dishes.some((d) => d.name.toLowerCase().includes(search.toLowerCase()))
-  );
-
-  if (!filtered.length) return <ErrorState message={`Inga resultat för "${search}".`} />;
-
-  return (
-    <div className="space-y-4">
-      <AnimatePresence mode="popLayout">
-        {filtered.map((menu, i) => (
-          <motion.div
-            key={menu.restaurantId}
-            custom={i}
-            variants={cardVariants}
-            initial="hidden"
-            animate="visible"
-            exit={{ opacity: 0, scale: 0.95 }}
-            layout
-          >
-            <RestaurantCard menu={menu} />
-          </motion.div>
-        ))}
-      </AnimatePresence>
-    </div>
-  );
-}
-
 function RestaurantCard({ menu }: { menu: LunchMenu }) {
   const mapsUrl = menu.address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(menu.address)}`
@@ -126,7 +91,6 @@ function RestaurantCard({ menu }: { menu: LunchMenu }) {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
-                aria-label={`Visa ${menu.restaurantName} på karta`}
               >
                 <MapPin className="h-3 w-3" />
                 {menu.address}
@@ -145,85 +109,20 @@ function RestaurantCard({ menu }: { menu: LunchMenu }) {
         </div>
       </CardHeader>
       <CardContent className="space-y-2">
-        <ul className="space-y-1.5" aria-label="Dagens rätter">
-          {menu.dishes.map((dish, i) => (
-            <li key={i} className="flex items-start gap-2 text-sm">
-              <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary" />
-              <span className="flex-1">{dish.name}</span>
-              {dish.tags?.map((tag) => <DishTag key={tag} tag={tag} />)}
-            </li>
-          ))}
-        </ul>
+        {menu.dishes.length > 0 ? (
+          <ul className="space-y-1.5" aria-label="Dagens rätter">
+            {menu.dishes.map((dish, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm">
+                <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary" />
+                <span className="flex-1">{dish.name}</span>
+                {dish.tags?.map((tag) => <DishTag key={tag} tag={tag} />)}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted-foreground italic">Ingen meny hittades</p>
+        )}
         <p className="text-xs text-muted-foreground pt-2">
-          Uppdaterad: {formatTime(menu.updatedAt)}
-        </p>
-      </CardContent>
-    </Card>
-  );
-}
-
-function WeekView({ search }: { search: string }) {
-  const { data, isLoading, error } = useWeeklyMenus();
-
-  if (isLoading) return <MenuSkeleton />;
-  if (error) return <ErrorState message="Kunde inte hämta veckomenyer. Försök igen senare." />;
-  if (!data?.length) return <ErrorState message="Inga veckomenyer hittades." />;
-
-  const filtered = data.filter((m) =>
-    m.restaurantName.toLowerCase().includes(search.toLowerCase())
-  );
-
-  if (!filtered.length) return <ErrorState message={`Inga resultat för "${search}".`} />;
-
-  return (
-    <div className="space-y-6">
-      {filtered.map((menu, i) => (
-        <motion.div
-          key={menu.restaurantId}
-          custom={i}
-          variants={cardVariants}
-          initial="hidden"
-          animate="visible"
-        >
-          <WeeklyRestaurantCard menu={menu} />
-        </motion.div>
-      ))}
-    </div>
-  );
-}
-
-function WeeklyRestaurantCard({ menu }: { menu: WeeklyLunchMenu }) {
-  return (
-    <Card className="glass-card">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-2">
-          <CardTitle className="text-lg font-display">{menu.restaurantName}</CardTitle>
-          <a
-            href={menu.websiteUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-shrink-0 text-muted-foreground hover:text-primary transition-colors"
-            aria-label={`Besök ${menu.restaurantName}s webbplats`}
-          >
-            <ExternalLink className="h-4 w-4" />
-          </a>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {menu.days.map((day) => (
-          <div key={day.date}>
-            <h4 className="font-semibold text-sm mb-1 font-display">{day.dayName}</h4>
-            <ul className="space-y-1" aria-label={`Rätter ${day.dayName}`}>
-              {day.dishes.map((dish, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm">
-                  <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary" />
-                  <span>{dish.name}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-        <p className="text-xs text-muted-foreground pt-1">
           Uppdaterad: {formatTime(menu.updatedAt)}
         </p>
       </CardContent>
@@ -233,52 +132,74 @@ function WeeklyRestaurantCard({ menu }: { menu: WeeklyLunchMenu }) {
 
 export default function LunchPage({ embedded }: { embedded?: boolean }) {
   const [search, setSearch] = useState("");
+  const { data, isLoading, error } = useLunchMenus();
+
+  const filtered = data?.filter((m) =>
+    m.restaurantName.toLowerCase().includes(search.toLowerCase()) ||
+    m.dishes.some((d) => d.name.toLowerCase().includes(search.toLowerCase()))
+  );
 
   const content = (
     <div className={embedded ? "space-y-4" : "container max-w-lg mx-auto px-4 py-6 space-y-4"}>
-        <motion.h1
-          className="text-2xl font-bold font-display"
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.4 }}
-        >
-          Lunch
-        </motion.h1>
+      <motion.div
+        className="flex items-center justify-between"
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.4 }}
+      >
+        <h1 className="text-2xl font-bold font-display">Lunch</h1>
+        <Link to="/admin" className="text-muted-foreground hover:text-primary transition-colors">
+          <Settings className="h-5 w-5" />
+        </Link>
+      </motion.div>
 
-        <motion.div
-          className="relative"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1, duration: 0.3 }}
-        >
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Sök restaurang eller rätt..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10"
-            aria-label="Sök bland restauranger"
-          />
-        </motion.div>
+      <motion.div
+        className="relative"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1, duration: 0.3 }}
+      >
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Sök restaurang eller rätt..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-10"
+          aria-label="Sök bland restauranger"
+        />
+      </motion.div>
 
-        <Tabs defaultValue="idag">
-          <TabsList className="w-full">
-            <TabsTrigger value="idag" className="flex-1">Idag</TabsTrigger>
-            <TabsTrigger value="veckan" className="flex-1">Veckan</TabsTrigger>
-          </TabsList>
-          <TabsContent value="idag">
-            <TodayView search={search} />
-          </TabsContent>
-          <TabsContent value="veckan">
-            <WeekView search={search} />
-          </TabsContent>
-        </Tabs>
+      {isLoading ? (
+        <MenuSkeleton />
+      ) : error ? (
+        <ErrorState message="Kunde inte hämta dagens menyer. Försök igen senare." />
+      ) : !filtered?.length ? (
+        <ErrorState message={search ? `Inga resultat för "${search}".` : "Inga menyer hittades för idag."} />
+      ) : (
+        <div className="space-y-4">
+          <AnimatePresence mode="popLayout">
+            {filtered.map((menu, i) => (
+              <motion.div
+                key={menu.restaurantId}
+                custom={i}
+                variants={cardVariants}
+                initial="hidden"
+                animate="visible"
+                exit={{ opacity: 0, scale: 0.95 }}
+                layout
+              >
+                <RestaurantCard menu={menu} />
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+      )}
 
-        <footer className="text-xs text-muted-foreground text-center pt-4 pb-8 space-y-1">
-          <p>Menyer kan ändras – kontrollera restaurangens sida.</p>
-          <p>Källa: Restaurangernas webbplatser</p>
-        </footer>
-      </div>
+      <footer className="text-xs text-muted-foreground text-center pt-4 pb-8 space-y-1">
+        <p>Menyer kan ändras – kontrollera restaurangens sida.</p>
+        <p>Källa: Restaurangernas webbplatser</p>
+      </footer>
+    </div>
   );
 
   if (embedded) return content;

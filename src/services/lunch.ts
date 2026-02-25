@@ -1,26 +1,11 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { LunchMenu, WeeklyLunchMenu } from "@/api/types";
-import { format, getISOWeek } from "date-fns";
+import type { LunchMenu } from "@/api/types";
 
 /**
- * Get the ISO week key for a date, e.g. "2026-W09"
+ * Fetch today's lunch menus via the edge function.
+ * The edge function handles caching internally.
  */
-function getWeekKey(date: Date): string {
-  return `${format(date, "yyyy")}-W${String(getISOWeek(date)).padStart(2, "0")}`;
-}
-
-/**
- * Check if we should trigger a fresh scrape:
- * - It's Monday and after 10:00 Swedish time
- * - No cache exists for the current week
- *
- * Otherwise, read from the database cache.
- */
-export async function getLunchMenus(_date?: Date): Promise<LunchMenu[]> {
-  const now = _date ?? new Date();
-  const weekKey = getWeekKey(now);
-
-  // Always try cache first via the edge function (which handles cache internally)
+export async function getLunchMenus(): Promise<LunchMenu[]> {
   const { data, error } = await supabase.functions.invoke("lunch-menus", {
     body: null,
   });
@@ -36,26 +21,4 @@ export async function getLunchMenus(_date?: Date): Promise<LunchMenu[]> {
   }
 
   return data as LunchMenu[];
-}
-
-export async function getWeeklyMenus(date?: Date): Promise<WeeklyLunchMenu[]> {
-  const menus = await getLunchMenus(date);
-  const d = date ?? new Date();
-  const week = getWeekKey(d);
-
-  return menus.map((menu) => ({
-    restaurantId: menu.restaurantId,
-    restaurantName: menu.restaurantName,
-    websiteUrl: menu.websiteUrl,
-    week,
-    days: [
-      {
-        date: menu.date,
-        dayName: "Denna vecka",
-        dishes: menu.dishes,
-      },
-    ],
-    sourceUrl: menu.sourceUrl,
-    updatedAt: menu.updatedAt,
-  }));
 }

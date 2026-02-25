@@ -8,32 +8,11 @@ const corsHeaders = {
 
 const AI_GATEWAY = 'https://ai.gateway.lovable.dev/v1/chat/completions';
 
-interface RestaurantInput {
-  id: string;
-  name: string;
-  websiteUrl: string;
-  menuUrl: string;
-  address?: string;
-}
-
-const RESTAURANTS: RestaurantInput[] = [
-  { id: '1', name: 'Bistrot', websiteUrl: 'https://bistrot.se/', menuUrl: 'https://bistrot.se/' },
-  { id: '2', name: 'Bombay Bistro', websiteUrl: 'https://www.bombaybistro.se/', menuUrl: 'https://www.bombaybistro.se/lunch/' },
-  { id: '3', name: "Cuckoo's Nest", websiteUrl: 'https://www.cuckoosnest.se/', menuUrl: 'https://www.cuckoosnest.se/menyer/lunch' },
-  { id: '4', name: 'District One', websiteUrl: 'https://www.districtone.se/', menuUrl: 'https://www.districtone.se/lunch.html' },
-  { id: '5', name: 'Kooperativet', websiteUrl: 'https://www.kooperativet.se/', menuUrl: 'https://www.kooperativet.se/' },
-  { id: '6', name: 'Masala Street Kitchen', websiteUrl: 'https://masalakitchen.se/', menuUrl: 'https://masalakitchen.se/lunch/' },
-  { id: '7', name: 'Pier11', websiteUrl: 'https://ericssonbynordrest.se/restaurang/restaurant-pier-11/', menuUrl: 'https://ericssonbynordrest.se/restaurang/restaurant-pier-11/' },
-  { id: '8', name: 'Uni3 - World of Food', websiteUrl: 'https://www.compass-group.se/restauranger-och-menyer/ovriga-restauranger/uni3-world-of-food/', menuUrl: 'https://www.compass-group.se/restauranger-och-menyer/ovriga-restauranger/uni3-world-of-food/' },
-];
-
-// Get ISO week key like "2026-W09"
-function getWeekKey(date: Date): string {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+function getTodayKey(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 async function scrapeUrl(url: string, firecrawlKey: string): Promise<string | null> {
@@ -58,18 +37,13 @@ async function scrapeUrl(url: string, firecrawlKey: string): Promise<string | nu
   }
 }
 
-interface ExtractedDish {
-  name: string;
-  tags?: string[];
-}
-
 async function extractMenuWithAI(
-  restaurant: RestaurantInput,
+  name: string,
   markdown: string,
   apiKey: string,
   todayStr: string
-): Promise<ExtractedDish[]> {
-  const prompt = `Du är en menyextraherare. Extrahera VECKANS lunchrätter från denna text för restaurangen "${restaurant.name}".
+): Promise<{ name: string; tags?: string[] }[]> {
+  const prompt = `Du är en menyextraherare. Extrahera DAGENS lunchrätter (dagens rätt / daily special) från denna text för restaurangen "${name}".
 
 Dagens datum: ${todayStr}
 
@@ -77,7 +51,8 @@ Svara ENBART med giltig JSON i detta format (inga kommentarer, ingen markdown):
 {"dishes":[{"name":"Rättens namn","tags":["vegetarisk"]}]}
 
 Taggar att använda (bara om det tydligt framgår): "vegetarisk", "vegansk", "fisk", "kött"
-Om du inte hittar några rätter, svara: {"dishes":[]}
+Om du inte hittar dagens rätter specifikt, extrahera de rätter som verkar mest aktuella.
+Om du inte hittar några rätter alls, svara: {"dishes":[]}
 
 Text att analysera:
 ${markdown.slice(0, 6000)}`;
@@ -93,7 +68,7 @@ ${markdown.slice(0, 6000)}`;
       }),
     });
     if (!res.ok) {
-      console.error(`AI extraction failed for ${restaurant.name}: ${res.status}`);
+      console.error(`AI extraction failed for ${name}: ${res.status}`);
       return [];
     }
     const data = await res.json();
@@ -103,7 +78,7 @@ ${markdown.slice(0, 6000)}`;
     const parsed = JSON.parse(jsonMatch[0]);
     return parsed.dishes || [];
   } catch (err) {
-    console.error(`AI extraction error for ${restaurant.name}:`, err);
+    console.error(`AI extraction error for ${name}:`, err);
     return [];
   }
 }
@@ -128,53 +103,66 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const now = new Date();
-    const weekKey = getWeekKey(now);
+    const todayKey = getTodayKey(now);
 
-    // Check cache first
+    // Check cache for today
     const { data: cached, error: cacheError } = await supabase
       .from('lunch_menu_cache')
       .select('menu_data')
-      .eq('week_key', weekKey);
+      .eq('week_key', todayKey);
 
     if (!cacheError && cached && cached.length > 0) {
-      console.log(`Serving ${cached.length} menus from cache for ${weekKey}`);
+      console.log(`Serving ${cached.length} menus from cache for ${todayKey}`);
       const menus = cached.map((row: { menu_data: unknown }) => row.menu_data);
       return new Response(JSON.stringify(menus), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // No cache – scrape all restaurants
-    console.log(`No cache for ${weekKey}. Scraping ${RESTAURANTS.length} restaurants...`);
-    const todayStr = now.toISOString().split('T')[0];
+    // Fetch restaurants from DB
+    const { data: restaurants, error: restError } = await supabase
+      .from('restaurants')
+      .select('*')
+      .eq('active', true)
+      .order('name');
+
+    if (restError || !restaurants?.length) {
+      console.error('Failed to load restaurants:', restError);
+      return new Response(JSON.stringify([]), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log(`No cache for ${todayKey}. Scraping ${restaurants.length} restaurants...`);
+
     const BATCH_SIZE = 4;
     const allMenus: unknown[] = [];
 
-    for (let i = 0; i < RESTAURANTS.length; i += BATCH_SIZE) {
-      const batch = RESTAURANTS.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < restaurants.length; i += BATCH_SIZE) {
+      const batch = restaurants.slice(i, i + BATCH_SIZE);
       const results = await Promise.all(
-        batch.map(async (r) => {
-          const markdown = await scrapeUrl(r.menuUrl, firecrawlKey);
+        batch.map(async (r: any) => {
+          const markdown = await scrapeUrl(r.menu_url, firecrawlKey);
           if (!markdown) {
             console.log(`No content scraped for ${r.name}`);
             return {
               restaurantId: r.id,
               restaurantName: r.name,
-              websiteUrl: r.websiteUrl,
-              date: todayStr,
+              websiteUrl: r.website_url,
+              date: todayKey,
               dishes: [],
-              sourceUrl: r.menuUrl,
+              sourceUrl: r.menu_url,
               updatedAt: now.toISOString(),
             };
           }
-          const dishes = await extractMenuWithAI(r, markdown, lovableKey, todayStr);
+          const dishes = await extractMenuWithAI(r.name, markdown, lovableKey, todayKey);
           return {
             restaurantId: r.id,
             restaurantName: r.name,
-            websiteUrl: r.websiteUrl,
-            date: todayStr,
+            websiteUrl: r.website_url,
+            date: todayKey,
             dishes,
-            sourceUrl: r.menuUrl,
+            sourceUrl: r.menu_url,
             updatedAt: now.toISOString(),
           };
         })
@@ -182,9 +170,9 @@ Deno.serve(async (req) => {
       allMenus.push(...results);
     }
 
-    // Store in cache
+    // Store in cache using today's date as key
     const rows = allMenus.map((menu: any) => ({
-      week_key: weekKey,
+      week_key: todayKey,
       restaurant_id: menu.restaurantId,
       menu_data: menu,
     }));
@@ -196,10 +184,10 @@ Deno.serve(async (req) => {
     if (insertError) {
       console.error('Cache insert error:', insertError);
     } else {
-      console.log(`Cached ${rows.length} menus for ${weekKey}`);
+      console.log(`Cached ${rows.length} menus for ${todayKey}`);
     }
 
-    console.log(`Done. Got menus for ${(allMenus as any[]).filter((m: any) => m.dishes.length > 0).length}/${RESTAURANTS.length} restaurants.`);
+    console.log(`Done. Got menus for ${(allMenus as any[]).filter((m: any) => m.dishes.length > 0).length}/${restaurants.length} restaurants.`);
 
     return new Response(JSON.stringify(allMenus), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
