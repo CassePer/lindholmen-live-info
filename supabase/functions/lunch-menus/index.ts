@@ -71,8 +71,13 @@ REGLER – läs ALLA innan du börjar:
 
 6. Inkludera rättens namn OCH beskrivning/tillbehör som en sammanhängande text. Ignorera priser.
 
+7. DAGSINFORMATION I NAMN: Skriv ut vilka dagar rätten gäller som prefix i namnet:
+   - Veckans rätter: "(Hela veckan) Rättnamn – tillbehör"
+   - Dagsintervall: "(Mån–Tis) Rättnamn – tillbehör"
+   - Enbart dagens rätt: Inget prefix behövs, det är underförstått att den gäller idag.
+
 Svara ENBART med giltig JSON (inga kommentarer, ingen markdown):
-{"dishes":[{"name":"Rättens namn – beskrivning/tillbehör","tags":["vegetarisk"]}]}
+{"dishes":[{"name":"(Hela veckan) Rättens namn – beskrivning/tillbehör","tags":["vegetarisk"]}]}
 
 Taggar (bara om det TYDLIGT framgår): "vegetarisk", "vegansk", "fisk", "kött"
 Om du inte hittar några rätter: {"dishes":[]}
