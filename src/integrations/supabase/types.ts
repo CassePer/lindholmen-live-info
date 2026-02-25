@@ -14,7 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      lunch_menu_cache: {
+        Row: {
+          created_at: string
+          id: string
+          menu_data: Json
+          restaurant_id: string
+          week_key: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          menu_data: Json
+          restaurant_id: string
+          week_key: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          menu_data?: Json
+          restaurant_id?: string
+          week_key?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
