@@ -15,7 +15,12 @@ function getTodayKey(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-async function scrapeUrl(url: string, firecrawlKey: string): Promise<string | null> {
+interface ScrapeResult {
+  markdown: string | null;
+  screenshot: string | null;
+}
+
+async function scrapeUrl(url: string, firecrawlKey: string): Promise<ScrapeResult> {
   try {
     const res = await fetch('https://api.firecrawl.dev/v1/scrape', {
       method: 'POST',
@@ -23,33 +28,36 @@ async function scrapeUrl(url: string, firecrawlKey: string): Promise<string | nu
         Authorization: `Bearer ${firecrawlKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ url, formats: ['markdown'], onlyMainContent: true, waitFor: 5000, timeout: 30000 }),
+      body: JSON.stringify({
+        url,
+        formats: ['markdown', 'screenshot'],
+        onlyMainContent: true,
+        waitFor: 5000,
+        timeout: 30000,
+      }),
     });
     if (!res.ok) {
       console.error(`Firecrawl error for ${url}: ${res.status}`);
-      return null;
+      return { markdown: null, screenshot: null };
     }
     const data = await res.json();
-    return data?.data?.markdown || data?.markdown || null;
+    const markdown = data?.data?.markdown || data?.markdown || null;
+    const screenshot = data?.data?.screenshot || data?.screenshot || null;
+    return { markdown, screenshot };
   } catch (err) {
     console.error(`Scrape failed for ${url}:`, err);
-    return null;
+    return { markdown: null, screenshot: null };
   }
 }
 
-async function extractMenuWithAI(
-  name: string,
-  markdown: string,
-  apiKey: string,
-  todayStr: string
-): Promise<{ name: string; tags?: string[] }[]> {
+function buildPrompt(name: string, todayStr: string): string {
   const dayNames = ['söndag', 'måndag', 'tisdag', 'onsdag', 'torsdag', 'fredag', 'lördag'];
   const dayAbbrevs = ['sön', 'mån', 'tis', 'ons', 'tors', 'fre', 'lör'];
   const todayIdx = new Date(todayStr).getDay();
   const todayDay = dayNames[todayIdx];
   const todayAbbrev = dayAbbrevs[todayIdx];
 
-  const prompt = `Du är en menyextraherare. Extrahera ENBART lunchrätter som serveras IDAG (${todayDay} ${todayStr}) från denna text för restaurangen "${name}".
+  return `Du är en menyextraherare. Extrahera ENBART lunchrätter som serveras IDAG (${todayDay} ${todayStr}) från innehållet för restaurangen "${name}".
 
 IDAG ÄR: ${todayDay} (förkortat: ${todayAbbrev})
 
@@ -80,10 +88,16 @@ Svara ENBART med giltig JSON (inga kommentarer, ingen markdown):
 {"dishes":[{"name":"(Hela veckan) Rättens namn – beskrivning/tillbehör","tags":["vegetarisk"]}]}
 
 Taggar (bara om det TYDLIGT framgår): "vegetarisk", "vegansk", "fisk", "kött"
-Om du inte hittar några rätter: {"dishes":[]}
+Om du inte hittar några rätter: {"dishes":[]}`;
+}
 
-Text att analysera:
-${markdown.slice(0, 8000)}`;
+async function extractMenuFromText(
+  name: string,
+  markdown: string,
+  apiKey: string,
+  todayStr: string
+): Promise<{ name: string; tags?: string[] }[]> {
+  const prompt = buildPrompt(name, todayStr) + `\n\nText att analysera:\n${markdown.slice(0, 8000)}`;
 
   try {
     const res = await fetch(AI_GATEWAY, {
@@ -96,7 +110,7 @@ ${markdown.slice(0, 8000)}`;
       }),
     });
     if (!res.ok) {
-      console.error(`AI extraction failed for ${name}: ${res.status}`);
+      console.error(`AI text extraction failed for ${name}: ${res.status}`);
       return [];
     }
     const data = await res.json();
@@ -106,10 +120,52 @@ ${markdown.slice(0, 8000)}`;
     const parsed = JSON.parse(jsonMatch[0]);
     return parsed.dishes || [];
   } catch (err) {
-    console.error(`AI extraction error for ${name}:`, err);
+    console.error(`AI text extraction error for ${name}:`, err);
     return [];
   }
 }
+
+async function extractMenuFromScreenshot(
+  name: string,
+  screenshotBase64: string,
+  apiKey: string,
+  todayStr: string
+): Promise<{ name: string; tags?: string[] }[]> {
+  const systemPrompt = buildPrompt(name, todayStr) + '\n\nAnalysera bilden/skärmbilden av restaurangens meny nedan.';
+
+  try {
+    const res = await fetch(AI_GATEWAY, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: systemPrompt },
+            { type: 'image_url', image_url: { url: screenshotBase64.startsWith('data:') ? screenshotBase64 : `data:image/png;base64,${screenshotBase64}` } },
+          ],
+        }],
+        temperature: 0.1,
+      }),
+    });
+    if (!res.ok) {
+      console.error(`AI vision extraction failed for ${name}: ${res.status}`);
+      return [];
+    }
+    const data = await res.json();
+    const content = data?.choices?.[0]?.message?.content || '';
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return [];
+    const parsed = JSON.parse(jsonMatch[0]);
+    return parsed.dishes || [];
+  } catch (err) {
+    console.error(`AI vision extraction error for ${name}:`, err);
+    return [];
+  }
+}
+
+const MIN_MARKDOWN_LENGTH = 200;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -170,20 +226,25 @@ Deno.serve(async (req) => {
       const batch = restaurants.slice(i, i + BATCH_SIZE);
       const results = await Promise.all(
         batch.map(async (r: any) => {
-          const markdown = await scrapeUrl(r.menu_url, firecrawlKey);
-          if (!markdown) {
-            console.log(`No content scraped for ${r.name}`);
-            return {
-              restaurantId: r.id,
-              restaurantName: r.name,
-              websiteUrl: r.website_url,
-              date: todayKey,
-              dishes: [],
-              sourceUrl: r.menu_url,
-              updatedAt: now.toISOString(),
-            };
+          const { markdown, screenshot } = await scrapeUrl(r.menu_url, firecrawlKey);
+
+          let dishes: { name: string; tags?: string[] }[] = [];
+
+          // Try markdown first if we got enough content
+          if (markdown && markdown.length >= MIN_MARKDOWN_LENGTH) {
+            dishes = await extractMenuFromText(r.name, markdown, lovableKey, todayKey);
           }
-          const dishes = await extractMenuWithAI(r.name, markdown, lovableKey, todayKey);
+
+          // Fallback to screenshot/vision if markdown yielded nothing
+          if (dishes.length === 0 && screenshot) {
+            console.log(`Falling back to vision for ${r.name}`);
+            dishes = await extractMenuFromScreenshot(r.name, screenshot, lovableKey, todayKey);
+          }
+
+          if (dishes.length === 0 && !markdown && !screenshot) {
+            console.log(`No content scraped for ${r.name}`);
+          }
+
           return {
             restaurantId: r.id,
             restaurantName: r.name,
@@ -198,7 +259,7 @@ Deno.serve(async (req) => {
       allMenus.push(...results);
     }
 
-    // Store in cache using today's date as key
+    // Store in cache
     const rows = allMenus.map((menu: any) => ({
       week_key: todayKey,
       restaurant_id: menu.restaurantId,
