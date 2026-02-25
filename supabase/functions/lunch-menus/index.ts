@@ -125,13 +125,44 @@ async function extractMenuFromText(
   }
 }
 
+async function fetchImageAsBase64(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const buffer = await res.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  } catch {
+    return null;
+  }
+}
+
 async function extractMenuFromScreenshot(
   name: string,
-  screenshotBase64: string,
+  screenshotData: string,
   apiKey: string,
   todayStr: string
 ): Promise<{ name: string; tags?: string[] }[]> {
   const systemPrompt = buildPrompt(name, todayStr) + '\n\nAnalysera bilden/skärmbilden av restaurangens meny nedan.';
+
+  let imageUrl: string;
+  if (screenshotData.startsWith('data:')) {
+    imageUrl = screenshotData;
+  } else if (screenshotData.startsWith('http')) {
+    // Firecrawl returns a URL, fetch and convert to base64
+    const base64 = await fetchImageAsBase64(screenshotData);
+    if (!base64) {
+      console.error(`Failed to fetch screenshot for ${name}`);
+      return [];
+    }
+    imageUrl = `data:image/png;base64,${base64}`;
+  } else {
+    imageUrl = `data:image/png;base64,${screenshotData}`;
+  }
 
   try {
     const res = await fetch(AI_GATEWAY, {
@@ -143,7 +174,7 @@ async function extractMenuFromScreenshot(
           role: 'user',
           content: [
             { type: 'text', text: systemPrompt },
-            { type: 'image_url', image_url: { url: screenshotBase64.startsWith('data:') ? screenshotBase64 : `data:image/png;base64,${screenshotBase64}` } },
+            { type: 'image_url', image_url: { url: imageUrl } },
           ],
         }],
         temperature: 0.1,
