@@ -196,6 +196,16 @@ function GroupedDepartures({ departures }: { departures: Departure[] }) {
                     )}
                   </Button>
                 )}
+                {group.type === "Färja" && (
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground mt-3 pt-2 border-t border-border/50">
+                    <span className="flex items-center gap-1">
+                      <Flag className="h-3 w-3 text-success" fill="currentColor" /> Gratis
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Flag className="h-3 w-3 text-primary" fill="currentColor" /> Kräver biljett
+                    </span>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </motion.div>
@@ -272,14 +282,6 @@ export default function DeparturesPage() {
 
         {data && data.departures.length > 0 && <GroupedDepartures departures={data.departures} />}
 
-        <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground pt-4">
-          <span className="flex items-center gap-1">
-            <Flag className="h-3 w-3 text-success" fill="currentColor" /> Gratisfärja
-          </span>
-          <span className="flex items-center gap-1">
-            <Flag className="h-3 w-3 text-primary" fill="currentColor" /> Kräver biljett
-          </span>
-        </div>
 
         <p className="text-xs text-muted-foreground text-center pt-2 pb-8">
           Uppdateras automatiskt var 30:e sekund · Data från Trafiklab.se
