@@ -82,13 +82,32 @@ function DepartureRow({ dep, index }: { dep: Departure; index: number }) {
   );
 }
 
+function splitDepartures(items: Departure[]): { past: Departure[]; upcoming: Departure[] } {
+  const now = new Date();
+  const nowHHmm = now.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit", hour12: false });
+
+  const past: Departure[] = [];
+  const upcoming: Departure[] = [];
+
+  for (const d of items) {
+    const depTime = d.estimatedTime ?? d.scheduledTime;
+    if (depTime < nowHHmm) {
+      past.push(d);
+    } else {
+      upcoming.push(d);
+    }
+  }
+  return { past, upcoming };
+}
+
 function GroupedDepartures({ departures }: { departures: Departure[] }) {
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
+  // Always show all three transport types, even if empty
   const grouped = TRANSPORT_ORDER.map((type) => ({
     type,
     items: departures.filter((d) => d.transportType === type),
-  })).filter((g) => g.items.length > 0);
+  }));
 
   // Also include transport types not in TRANSPORT_ORDER (e.g. "Tåg")
   const knownTypes = new Set(TRANSPORT_ORDER);
@@ -109,9 +128,12 @@ function GroupedDepartures({ departures }: { departures: Departure[] }) {
   return (
     <div className="space-y-4">
       {allGroups.map((group, gi) => {
+        const { past, upcoming } = splitDepartures(group.items);
+        const lastDeparture = past.length > 0 ? past[past.length - 1] : null;
         const isExpanded = expandedGroups[group.type] ?? false;
-        const visibleItems = isExpanded ? group.items : group.items.slice(0, INITIAL_VISIBLE);
-        const hasMore = group.items.length > INITIAL_VISIBLE;
+        const defaultVisible = upcoming.slice(0, INITIAL_VISIBLE);
+        const visibleUpcoming = isExpanded ? upcoming : defaultVisible;
+        const hasMore = upcoming.length > INITIAL_VISIBLE;
 
         return (
           <motion.div
@@ -126,14 +148,30 @@ function GroupedDepartures({ departures }: { departures: Departure[] }) {
                   {TRANSPORT_ICON[group.type] ?? <Bus className="h-5 w-5" />}
                   {group.type}
                   <span className="text-xs text-muted-foreground font-normal ml-auto">
-                    {group.items.length} avgångar
+                    {upcoming.length > 0
+                      ? `${upcoming.length} kommande`
+                      : "Inga avgångar just nu"}
                   </span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
+                {group.items.length === 0 && (
+                  <p className="text-sm text-muted-foreground py-4 text-center">
+                    Inga avgångar att visa just nu.
+                  </p>
+                )}
                 <div role="list" aria-label={`Avgångar med ${group.type}`}>
                   <AnimatePresence initial={false}>
-                    {visibleItems.map((dep, i) => (
+                    {lastDeparture && (
+                      <div className="opacity-50">
+                        <div className="flex items-center gap-1 mb-1">
+                          <span className="text-xs text-muted-foreground font-medium">Senaste avgång</span>
+                        </div>
+                        <DepartureRow dep={lastDeparture} index={0} />
+                        <div className="border-b-2 border-border my-2" />
+                      </div>
+                    )}
+                    {visibleUpcoming.map((dep, i) => (
                       <DepartureRow key={dep.id} dep={dep} index={i} />
                     ))}
                   </AnimatePresence>
@@ -153,7 +191,7 @@ function GroupedDepartures({ departures }: { departures: Departure[] }) {
                     ) : (
                       <>
                         <ChevronDown className="h-4 w-4 mr-1" />
-                        Visa alla {group.items.length} avgångar
+                        Visa alla {upcoming.length} avgångar
                       </>
                     )}
                   </Button>

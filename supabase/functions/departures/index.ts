@@ -122,10 +122,20 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const time = url.searchParams.get('time');
 
+    // If no explicit time, fetch from 45 min ago to include recent past departures
+    let queryTime = time;
+    if (!queryTime) {
+      const now = new Date();
+      now.setMinutes(now.getMinutes() - 45);
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      queryTime = `${hh}:${mm}`;
+    }
+
     // Fetch departures from both Lindholmen (bus/tram) and Lindholmspiren (ferry) in parallel
     const results = await Promise.all([
-      fetchDepartures(LINDHOLMEN_AREA_ID, apiKey, time),
-      fetchDepartures(LINDHOLMSPIREN_AREA_ID, apiKey, time),
+      fetchDepartures(LINDHOLMEN_AREA_ID, apiKey, queryTime),
+      fetchDepartures(LINDHOLMSPIREN_AREA_ID, apiKey, queryTime),
     ]);
 
     
