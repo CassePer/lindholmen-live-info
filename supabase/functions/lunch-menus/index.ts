@@ -46,16 +46,14 @@ async function extractMenuWithAI(
   const dayNames = ['söndag', 'måndag', 'tisdag', 'onsdag', 'torsdag', 'fredag', 'lördag'];
   const todayDay = dayNames[new Date(todayStr).getDay()];
 
-  const prompt = `Du är en menyextraherare. Extrahera lunchrätter för IDAG (${todayDay}) från denna text för restaurangen "${name}".
+  const prompt = `Du är en menyextraherare. Extrahera ENBART lunchrätter som serveras IDAG (${todayDay} ${todayStr}) från denna text för restaurangen "${name}".
 
-Dagens datum: ${todayStr} (${todayDay})
-
-VIKTIGT: Många restauranger har BÅDE:
-1. "Veckans rätter" / rätter som serveras hela veckan – dessa ska ALLTID inkluderas
-2. Dagspecifika rätter (t.ex. "Måndag: ...", "Tisdag: ...") – inkludera BARA de som gäller ${todayDay}
-3. Vissa rätter gäller flera dagar (t.ex. "Mån-Ons: ...") – inkludera om ${todayDay} ingår i spannet
-
-Kombinera veckans rätter + dagens specifika rätter till EN lista.
+REGLER:
+1. Inkludera rätter som EXPLICIT gäller "${todayDay}" (t.ex. "${todayDay}: Pasta bolognese")
+2. Inkludera rätter som gäller ett spann av dagar som INKLUDERAR ${todayDay} (t.ex. "Mån-Ons: Soppa" om ${todayDay} är tisdag)
+3. Inkludera "Veckans rätter" / rätter som serveras HELA veckan / rätter utan dagsangivelse (t.ex. "Alltid på menyn", "Veckans pasta", "Whole week")
+4. UTESLUT HELT rätter som tillhör andra veckodagar (t.ex. om det står "Tisdag: Fisk" och idag är ${todayDay} och ${todayDay} INTE är tisdag, hoppa över den)
+5. Om en rätt har pris, ignorera priset – inkludera bara namn och beskrivning
 
 Svara ENBART med giltig JSON i detta format (inga kommentarer, ingen markdown):
 {"dishes":[{"name":"Rättens namn med beskrivning","tags":["vegetarisk"]}]}
