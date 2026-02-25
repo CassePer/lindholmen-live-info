@@ -51,7 +51,7 @@
     --success-foreground: 0 0% 100%;
     --warning: 40 90% 50%;
     --warning-foreground: 220 25% 10%;
-    --ferry: 205 75% 45%;
+    --ferry: 210 90% 62%;
     --tram: 185 65% 28%;
     --bus: 25 85% 52%;
   }
@@ -98,7 +98,7 @@
     --success-foreground: 0 0% 100%;
     --warning: 40 80% 50%;
     --warning-foreground: 220 20% 8%;
-    --ferry: 205 65% 55%;
+    --ferry: 210 85% 72%;
     --tram: 185 55% 45%;
     --bus: 25 75% 58%;
   }

@@ -60,7 +60,7 @@ function DepartureRow({ dep, index }: { dep: Departure; index: number }) {
         <Flag className="h-4 w-4 text-success shrink-0" fill="currentColor" aria-label="Gratisfärja" />
       )}
       {dep.line === "285" && (
-        <Flag className="h-4 w-4 text-primary shrink-0" fill="currentColor" aria-label="Betalfärja" />
+        <Flag className="h-4 w-4 text-ferry shrink-0" fill="currentColor" aria-label="Betalfärja" />
       )}
       <div className="flex-1 min-w-0">
         <p className="text-sm truncate">{dep.destination}</p>
@@ -202,7 +202,7 @@ function GroupedDepartures({ departures }: { departures: Departure[] }) {
                       <Flag className="h-3 w-3 text-success" fill="currentColor" /> Gratis
                     </span>
                     <span className="flex items-center gap-1">
-                      <Flag className="h-3 w-3 text-primary" fill="currentColor" /> Kräver biljett
+                      <Flag className="h-3 w-3 text-ferry" fill="currentColor" /> Kräver biljett
                     </span>
                   </div>
                 )}
@@ -215,7 +215,7 @@ function GroupedDepartures({ departures }: { departures: Departure[] }) {
   );
 }
 
-export default function DeparturesPage() {
+export default function DeparturesPage({ embedded }: { embedded?: boolean }) {
   const { data, isLoading, error, dataUpdatedAt } = useDepartures();
   const queryClient = useQueryClient();
 
@@ -229,9 +229,8 @@ export default function DeparturesPage() {
 
   const stopName = data?.stopName || "Lindholmspiren";
 
-  return (
-    <main className="flex-1 overflow-auto">
-      <div className="container max-w-lg mx-auto px-4 py-6 space-y-4">
+  const content = (
+    <div className={embedded ? "space-y-4" : "container max-w-lg mx-auto px-4 py-6 space-y-4"}>
         <div className="flex items-center justify-between">
           <motion.h1
             className="text-2xl font-bold font-display"
@@ -287,6 +286,8 @@ export default function DeparturesPage() {
           Uppdateras automatiskt var 30:e sekund · Data från Trafiklab.se
         </p>
       </div>
-    </main>
   );
+
+  if (embedded) return content;
+  return <main className="flex-1 overflow-auto">{content}</main>;
 }
