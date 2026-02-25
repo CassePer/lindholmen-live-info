@@ -38,6 +38,33 @@ export type Database = {
         }
         Relationships: []
       }
+      restaurants: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          menu_url: string
+          name: string
+          website_url: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          menu_url: string
+          name: string
+          website_url: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          menu_url?: string
+          name?: string
+          website_url?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

@@ -9,6 +9,7 @@ import LunchPage from "@/pages/LunchPage";
 import DeparturesPage from "@/pages/DeparturesPage";
 import CamerasPage from "@/pages/CamerasPage";
 import DashboardPage from "@/pages/DashboardPage";
+import AdminPage from "@/pages/AdminPage";
 import InstallPage from "@/pages/InstallPage";
 import NotFound from "@/pages/NotFound";
 import { InstallBanner } from "@/components/InstallBanner";
@@ -25,6 +26,7 @@ function AppLayout() {
       <div className="flex min-h-svh flex-col">
         <Routes>
           <Route path="/" element={<DashboardPage />} />
+          <Route path="/admin" element={<AdminPage />} />
           <Route path="/install" element={<InstallPage />} />
           <Route path="*" element={<DashboardPage />} />
         </Routes>
@@ -36,12 +38,13 @@ function AppLayout() {
   return (
     <div className="flex min-h-svh flex-col">
       <InstallBanner />
-      <Routes>
-        <Route path="/" element={<LunchPage />} />
-        <Route path="/avgangar" element={<DeparturesPage />} />
-        <Route path="/kameror" element={<CamerasPage />} />
-        <Route path="/install" element={<InstallPage />} />
-        <Route path="*" element={<NotFound />} />
+        <Routes>
+          <Route path="/" element={<LunchPage />} />
+          <Route path="/avgangar" element={<DeparturesPage />} />
+          <Route path="/kameror" element={<CamerasPage />} />
+          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/install" element={<InstallPage />} />
+          <Route path="*" element={<NotFound />} />
       </Routes>
       <BottomNav />
     </div>
