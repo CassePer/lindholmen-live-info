@@ -29,6 +29,31 @@ Deno.serve(async (req) => {
 
     if (req.method === 'POST') {
       const body = await req.json();
+
+      // Handle action-based requests (delete, clear_cache)
+      if (body.action === 'clear_cache') {
+        const { error } = await supabase.from('lunch_menu_cache').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        if (error) throw error;
+        return new Response(JSON.stringify({ ok: true, cleared: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (body.action === 'delete') {
+        if (!body.id) {
+          return new Response(JSON.stringify({ error: 'id required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        const { error } = await supabase.from('restaurants').delete().eq('id', body.id);
+        if (error) throw error;
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Default POST: create restaurant
       const { name, website_url, menu_url } = body;
       if (!name || !menu_url) {
         return new Response(JSON.stringify({ error: 'name and menu_url required' }), {
@@ -69,12 +94,14 @@ Deno.serve(async (req) => {
     }
 
     if (req.method === 'DELETE') {
-      const url = new URL(req.url);
-      const id = url.searchParams.get('id');
-      const clearCache = url.searchParams.get('clear_cache');
+      const rawBody = await req.text();
+      let body: Record<string, unknown> = {};
+      try { body = JSON.parse(rawBody); } catch { /* empty */ }
+      const id = body.id as string | undefined;
+      const clearCache = body.clear_cache;
 
       // Clear lunch cache
-      if (clearCache === 'true') {
+      if (clearCache) {
         const { error } = await supabase.from('lunch_menu_cache').delete().neq('id', '00000000-0000-0000-0000-000000000000');
         if (error) throw error;
         return new Response(JSON.stringify({ ok: true, cleared: true }), {
@@ -82,13 +109,27 @@ Deno.serve(async (req) => {
         });
       }
 
-      if (!id) {
+      // Also check URL params as fallback
+      const url = new URL(req.url);
+      const urlId = url.searchParams.get('id');
+      const urlClearCache = url.searchParams.get('clear_cache');
+
+      if (urlClearCache === 'true') {
+        const { error } = await supabase.from('lunch_menu_cache').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        if (error) throw error;
+        return new Response(JSON.stringify({ ok: true, cleared: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const finalId = id || urlId;
+      if (!finalId) {
         return new Response(JSON.stringify({ error: 'id required' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      const { error } = await supabase.from('restaurants').delete().eq('id', id);
+      const { error } = await supabase.from('restaurants').delete().eq('id', finalId);
       if (error) throw error;
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
