@@ -23,7 +23,7 @@ async function scrapeUrl(url: string, firecrawlKey: string): Promise<string | nu
         Authorization: `Bearer ${firecrawlKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ url, formats: ['markdown'], onlyMainContent: true, waitFor: 3000 }),
+      body: JSON.stringify({ url, formats: ['markdown'], onlyMainContent: true, waitFor: 5000, timeout: 30000 }),
     });
     if (!res.ok) {
       console.error(`Firecrawl error for ${url}: ${res.status}`);
