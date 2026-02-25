@@ -43,15 +43,24 @@ async function extractMenuWithAI(
   apiKey: string,
   todayStr: string
 ): Promise<{ name: string; tags?: string[] }[]> {
-  const prompt = `Du är en menyextraherare. Extrahera DAGENS lunchrätter (dagens rätt / daily special) från denna text för restaurangen "${name}".
+  const dayNames = ['söndag', 'måndag', 'tisdag', 'onsdag', 'torsdag', 'fredag', 'lördag'];
+  const todayDay = dayNames[new Date(todayStr).getDay()];
 
-Dagens datum: ${todayStr}
+  const prompt = `Du är en menyextraherare. Extrahera lunchrätter för IDAG (${todayDay}) från denna text för restaurangen "${name}".
+
+Dagens datum: ${todayStr} (${todayDay})
+
+VIKTIGT: Många restauranger har BÅDE:
+1. "Veckans rätter" / rätter som serveras hela veckan – dessa ska ALLTID inkluderas
+2. Dagspecifika rätter (t.ex. "Måndag: ...", "Tisdag: ...") – inkludera BARA de som gäller ${todayDay}
+3. Vissa rätter gäller flera dagar (t.ex. "Mån-Ons: ...") – inkludera om ${todayDay} ingår i spannet
+
+Kombinera veckans rätter + dagens specifika rätter till EN lista.
 
 Svara ENBART med giltig JSON i detta format (inga kommentarer, ingen markdown):
-{"dishes":[{"name":"Rättens namn","tags":["vegetarisk"]}]}
+{"dishes":[{"name":"Rättens namn med beskrivning","tags":["vegetarisk"]}]}
 
 Taggar att använda (bara om det tydligt framgår): "vegetarisk", "vegansk", "fisk", "kött"
-Om du inte hittar dagens rätter specifikt, extrahera de rätter som verkar mest aktuella.
 Om du inte hittar några rätter alls, svara: {"dishes":[]}
 
 Text att analysera:
