@@ -272,7 +272,16 @@ export default function DeparturesPage() {
 
         {data && data.departures.length > 0 && <GroupedDepartures departures={data.departures} />}
 
-        <p className="text-xs text-muted-foreground text-center pt-4 pb-8">
+        <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground pt-4">
+          <span className="flex items-center gap-1">
+            <Flag className="h-3 w-3 text-success" /> Gratisfärja
+          </span>
+          <span className="flex items-center gap-1">
+            <Flag className="h-3 w-3 text-primary" /> Kräver biljett
+          </span>
+        </div>
+
+        <p className="text-xs text-muted-foreground text-center pt-2 pb-8">
           Uppdateras automatiskt var 30:e sekund · Data från Trafiklab.se
         </p>
       </div>
