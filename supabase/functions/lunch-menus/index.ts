@@ -44,32 +44,48 @@ async function extractMenuWithAI(
   todayStr: string
 ): Promise<{ name: string; tags?: string[] }[]> {
   const dayNames = ['söndag', 'måndag', 'tisdag', 'onsdag', 'torsdag', 'fredag', 'lördag'];
-  const todayDay = dayNames[new Date(todayStr).getDay()];
+  const dayAbbrevs = ['sön', 'mån', 'tis', 'ons', 'tors', 'fre', 'lör'];
+  const todayIdx = new Date(todayStr).getDay();
+  const todayDay = dayNames[todayIdx];
+  const todayAbbrev = dayAbbrevs[todayIdx];
 
   const prompt = `Du är en menyextraherare. Extrahera ENBART lunchrätter som serveras IDAG (${todayDay} ${todayStr}) från denna text för restaurangen "${name}".
 
-REGLER:
-1. Inkludera rätter som EXPLICIT gäller "${todayDay}" (t.ex. "${todayDay}: Pasta bolognese")
-2. Inkludera rätter som gäller ett spann av dagar som INKLUDERAR ${todayDay} (t.ex. "Mån-Ons: Soppa" om ${todayDay} är tisdag)
-3. Inkludera "Veckans rätter" / rätter som serveras HELA veckan / rätter utan dagsangivelse (t.ex. "Alltid på menyn", "Veckans pasta", "Whole week")
-4. UTESLUT HELT rätter som tillhör andra veckodagar (t.ex. om det står "Tisdag: Fisk" och idag är ${todayDay} och ${todayDay} INTE är tisdag, hoppa över den)
-5. Om en rätt har pris, ignorera priset – inkludera bara namn och beskrivning
+IDAG ÄR: ${todayDay} (förkortat: ${todayAbbrev})
 
-Svara ENBART med giltig JSON i detta format (inga kommentarer, ingen markdown):
-{"dishes":[{"name":"Rättens namn med beskrivning","tags":["vegetarisk"]}]}
+REGLER – läs ALLA innan du börjar:
 
-Taggar att använda (bara om det tydligt framgår): "vegetarisk", "vegansk", "fisk", "kött"
-Om du inte hittar några rätter alls, svara: {"dishes":[]}
+1. VECKANS RÄTTER: Inkludera rätter markerade som "Veckans", "Hela veckan", "Alltid på menyn", eller rätter utan dagsangivelse som uppenbart gäller hela veckan. Dessa serveras VARJE dag.
+
+2. DAGSPECIFIKA RÄTTER: Inkludera rätter som explicit tillhör "${todayDay}" (t.ex. "${todayDay}: Pasta bolognese", eller under rubriken "${todayDay}").
+
+3. DAGSINTERVALL: Inkludera rätter med ett dagsintervall som INKLUDERAR ${todayDay}. Exempel:
+   - "Mån–Tis" inkluderar måndag och tisdag
+   - "Ons–Tors" inkluderar onsdag och torsdag
+   - "Mån–Ons" inkluderar måndag, tisdag, onsdag
+   Kontrollera att ${todayDay} faktiskt ingår i intervallet.
+
+4. CAESARSALLAD / STÅENDE RÄTTER: Om en rätt står utanför dagstrukturen (t.ex. efter veckans rätter men före dagarna) och inte har en dagsangivelse, räkna den som en veckans rätt.
+
+5. UTESLUT rätter som tillhör ANDRA specifika veckodagar. Om det står "Tisdag: Fisk" och idag INTE är tisdag → hoppa över.
+
+6. Inkludera rättens namn OCH beskrivning/tillbehör som en sammanhängande text. Ignorera priser.
+
+Svara ENBART med giltig JSON (inga kommentarer, ingen markdown):
+{"dishes":[{"name":"Rättens namn – beskrivning/tillbehör","tags":["vegetarisk"]}]}
+
+Taggar (bara om det TYDLIGT framgår): "vegetarisk", "vegansk", "fisk", "kött"
+Om du inte hittar några rätter: {"dishes":[]}
 
 Text att analysera:
-${markdown.slice(0, 6000)}`;
+${markdown.slice(0, 8000)}`;
 
   try {
     const res = await fetch(AI_GATEWAY, {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-lite',
+        model: 'google/gemini-2.5-flash',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.1,
       }),
