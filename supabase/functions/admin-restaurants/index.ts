@@ -50,6 +50,17 @@ Deno.serve(async (req) => {
     if (req.method === 'DELETE') {
       const url = new URL(req.url);
       const id = url.searchParams.get('id');
+      const clearCache = url.searchParams.get('clear_cache');
+
+      // Clear lunch cache
+      if (clearCache === 'true') {
+        const { error } = await supabase.from('lunch_menu_cache').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        if (error) throw error;
+        return new Response(JSON.stringify({ ok: true, cleared: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       if (!id) {
         return new Response(JSON.stringify({ error: 'id required' }), {
           status: 400,

@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Trash2, Plus, ArrowLeft, ExternalLink } from "lucide-react";
+import { Trash2, Plus, ArrowLeft, ExternalLink, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -73,6 +73,22 @@ export default function AdminPage() {
     onError: () => toast.error("Kunde inte ta bort restaurang"),
   });
 
+  const clearCacheMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke(
+        "admin-restaurants?clear_cache=true",
+        { method: "DELETE" }
+      );
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["lunch"] });
+      toast.success("Cache rensad – menyerna hämtas om vid nästa laddning");
+    },
+    onError: () => toast.error("Kunde inte rensa cachen"),
+  });
+
   const canAdd = name.trim() && menuUrl.trim();
 
   return (
@@ -84,7 +100,16 @@ export default function AdminPage() {
               <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>
-          <h1 className="text-2xl font-bold font-display">Hantera restauranger</h1>
+          <h1 className="text-2xl font-bold font-display flex-1">Hantera restauranger</h1>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => clearCacheMutation.mutate()}
+            disabled={clearCacheMutation.isPending}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${clearCacheMutation.isPending ? "animate-spin" : ""}`} />
+            {clearCacheMutation.isPending ? "Rensar..." : "Rensa cache"}
+          </Button>
         </div>
 
         {/* Add form */}
