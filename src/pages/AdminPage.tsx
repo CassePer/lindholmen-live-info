@@ -174,10 +174,10 @@ export default function AdminPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { data, error } = await supabase.functions.invoke(
-        `admin-restaurants?id=${id}`,
-        { method: "DELETE" }
-      );
+      const { data, error } = await supabase.functions.invoke("admin-restaurants", {
+        method: "POST",
+        body: { action: "delete", id },
+      });
       if (error) throw error;
       return data;
     },
@@ -190,10 +190,10 @@ export default function AdminPage() {
 
   const clearCacheMutation = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke(
-        "admin-restaurants?clear_cache=true",
-        { method: "DELETE" }
-      );
+      const { data, error } = await supabase.functions.invoke("admin-restaurants", {
+        method: "POST",
+        body: { action: "clear_cache" },
+      });
       if (error) throw error;
       return data;
     },
