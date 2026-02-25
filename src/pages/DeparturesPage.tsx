@@ -57,10 +57,10 @@ function DepartureRow({ dep, index }: { dep: Departure; index: number }) {
         {dep.line}
       </span>
       {dep.line === "286" && (
-        <Flag className="h-4 w-4 text-success shrink-0" aria-label="Gratisfärja" />
+        <Flag className="h-4 w-4 text-success shrink-0" fill="currentColor" aria-label="Gratisfärja" />
       )}
       {dep.line === "285" && (
-        <Flag className="h-4 w-4 text-primary shrink-0" aria-label="Betalfärja" />
+        <Flag className="h-4 w-4 text-primary shrink-0" fill="currentColor" aria-label="Betalfärja" />
       )}
       <div className="flex-1 min-w-0">
         <p className="text-sm truncate">{dep.destination}</p>
@@ -274,10 +274,10 @@ export default function DeparturesPage() {
 
         <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground pt-4">
           <span className="flex items-center gap-1">
-            <Flag className="h-3 w-3 text-success" /> Gratisfärja
+            <Flag className="h-3 w-3 text-success" fill="currentColor" /> Gratisfärja
           </span>
           <span className="flex items-center gap-1">
-            <Flag className="h-3 w-3 text-primary" /> Kräver biljett
+            <Flag className="h-3 w-3 text-primary" fill="currentColor" /> Kräver biljett
           </span>
         </div>
 
