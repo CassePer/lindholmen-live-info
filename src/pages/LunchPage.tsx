@@ -231,12 +231,11 @@ function WeeklyRestaurantCard({ menu }: { menu: WeeklyLunchMenu }) {
   );
 }
 
-export default function LunchPage() {
+export default function LunchPage({ embedded }: { embedded?: boolean }) {
   const [search, setSearch] = useState("");
 
-  return (
-    <main className="flex-1 overflow-auto">
-      <div className="container max-w-lg mx-auto px-4 py-6 space-y-4">
+  const content = (
+    <div className={embedded ? "space-y-4" : "container max-w-lg mx-auto px-4 py-6 space-y-4"}>
         <motion.h1
           className="text-2xl font-bold font-display"
           initial={{ opacity: 0, x: -20 }}
@@ -280,6 +279,8 @@ export default function LunchPage() {
           <p>Källa: Restaurangernas webbplatser</p>
         </footer>
       </div>
-    </main>
   );
+
+  if (embedded) return content;
+  return <main className="flex-1 overflow-auto">{content}</main>;
 }
