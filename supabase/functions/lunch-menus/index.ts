@@ -30,7 +30,7 @@ async function scrapeUrl(url: string, firecrawlKey: string): Promise<ScrapeResul
       },
       body: JSON.stringify({
         url,
-        formats: ['markdown', 'screenshot'],
+        formats: ['markdown', 'screenshot@fullPage'],
         onlyMainContent: true,
         waitFor: 5000,
         timeout: 30000,
@@ -95,9 +95,26 @@ async function extractMenuFromText(
   name: string,
   markdown: string,
   apiKey: string,
-  todayStr: string
+  todayStr: string,
+  isPreFilteredForToday = false
 ): Promise<{ name: string; tags?: string[] }[]> {
-  const prompt = buildPrompt(name, todayStr) + `\n\nText att analysera:\n${markdown.slice(0, 15000)}`;
+  let prompt: string;
+  if (isPreFilteredForToday) {
+    prompt = `Du är en menyextraherare. Extrahera lunchrätter från innehållet för restaurangen "${name}".
+
+VIKTIGT: Texten nedan innehåller ENBART dagens meny (redan filtrerad). Alla rätter gäller idag. Lägg INTE till prefix som "(Hela veckan)".
+
+Svara ENBART med giltig JSON (inga kommentarer, ingen markdown):
+{"dishes":[{"name":"Rättens namn – beskrivning/tillbehör","tags":["vegetarisk"]}]}
+
+Taggar (bara om det TYDLIGT framgår): "vegetarisk", "vegansk", "fisk", "kött"
+Om du inte hittar några rätter: {"dishes":[]}
+
+Text att analysera:
+${markdown.slice(0, 15000)}`;
+  } else {
+    prompt = buildPrompt(name, todayStr) + `\n\nText att analysera:\n${markdown.slice(0, 15000)}`;
+  }
 
   try {
     const res = await fetch(AI_GATEWAY, {
@@ -317,7 +334,7 @@ Deno.serve(async (req) => {
             const rssText = await fetchRssMenu(r.rss_url, todayKey);
             if (rssText) {
               console.log(`Using RSS feed for ${r.name}`);
-              dishes = await extractMenuFromText(r.name, rssText, lovableKey, todayKey);
+              dishes = await extractMenuFromText(r.name, rssText, lovableKey, todayKey, true);
             }
           }
 
