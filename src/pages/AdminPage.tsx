@@ -4,10 +4,30 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Trash2, Plus, ArrowLeft, ExternalLink, RefreshCw, Pencil, Check, X, Settings, Lock } from "lucide-react";
+import { Trash2, Plus, ArrowLeft, ExternalLink, RefreshCw, Pencil, Check, X, Settings, Lock, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+
+const ADMIN_SESSION_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function getAdminSession(): boolean {
+  const raw = sessionStorage.getItem("admin_authenticated_at");
+  if (!raw) return false;
+  if (Date.now() - Number(raw) > ADMIN_SESSION_TTL_MS) {
+    sessionStorage.removeItem("admin_authenticated_at");
+    return false;
+  }
+  return true;
+}
+
+function setAdminSession() {
+  sessionStorage.setItem("admin_authenticated_at", String(Date.now()));
+}
+
+function clearAdminSession() {
+  sessionStorage.removeItem("admin_authenticated_at");
+}
 
 // ── Password Gate ──
 
@@ -28,7 +48,7 @@ function AdminPasswordGate({ onAuthenticated }: { onAuthenticated: () => void })
       if (fnError || !data?.valid) {
         setError(true);
       } else {
-        sessionStorage.setItem("admin_authenticated", "true");
+        setAdminSession();
         onAuthenticated();
       }
     } catch {
@@ -171,7 +191,7 @@ function EditableRestaurantRow({
 
 // ── Main admin page ──
 
-function AdminContent() {
+function AdminContent({ onLogout }: { onLogout: () => void }) {
   const queryClient = useQueryClient();
   const { data: restaurants, isLoading } = useRestaurants();
   const { data: settings } = useSettings();
@@ -244,8 +264,10 @@ function AdminContent() {
         <div className="flex items-center gap-3">
           <Link to="/"><Button variant="ghost" size="icon"><ArrowLeft className="h-5 w-5" /></Button></Link>
           <h1 className="text-2xl font-bold font-display flex-1">Admin</h1>
+          <Button variant="outline" size="sm" onClick={onLogout}>
+            <LogOut className="h-4 w-4 mr-1" /> Logga ut
+          </Button>
         </div>
-
         {/* Settings */}
         <Card className="glass-card">
           <CardHeader>
@@ -323,13 +345,16 @@ function AdminContent() {
 // ── Export with gate ──
 
 export default function AdminPage() {
-  const [authenticated, setAuthenticated] = useState(
-    () => sessionStorage.getItem("admin_authenticated") === "true"
-  );
+  const [authenticated, setAuthenticated] = useState(getAdminSession);
+
+  const handleLogout = () => {
+    clearAdminSession();
+    setAuthenticated(false);
+  };
 
   if (!authenticated) {
     return <AdminPasswordGate onAuthenticated={() => setAuthenticated(true)} />;
   }
 
-  return <AdminContent />;
+  return <AdminContent onLogout={handleLogout} />;
 }
