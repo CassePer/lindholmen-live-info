@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useLunchMenus } from "@/hooks/use-lunch";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ExternalLink, Search, AlertCircle, MapPin } from "lucide-react";
+import { ExternalLink, Search, AlertCircle, MapPin, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useQueryClient } from "@tanstack/react-query";
 import type { LunchMenu, DietTag } from "@/api/types";
 
 const TAG_LABELS: Record<DietTag, string> = {
@@ -62,6 +64,10 @@ function ErrorState({ message }: { message: string }) {
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("sv-SE", { year: "numeric", month: "2-digit", day: "2-digit" });
 }
 
 const cardVariants = {
@@ -122,7 +128,7 @@ function RestaurantCard({ menu }: { menu: LunchMenu }) {
           <p className="text-sm text-muted-foreground italic">Ingen meny hittades</p>
         )}
         <p className="text-xs text-muted-foreground pt-2">
-          Uppdaterad: {formatTime(menu.updatedAt)}
+          Uppdaterad: {formatDate(menu.updatedAt)} kl {formatTime(menu.updatedAt)}
         </p>
       </CardContent>
     </Card>
@@ -132,6 +138,11 @@ function RestaurantCard({ menu }: { menu: LunchMenu }) {
 export default function LunchPage({ embedded }: { embedded?: boolean }) {
   const [search, setSearch] = useState("");
   const { data, isLoading, error } = useLunchMenus();
+  const queryClient = useQueryClient();
+
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["lunch"] });
+  };
 
   const filtered = data?.filter((m) =>
     m.restaurantName.toLowerCase().includes(search.toLowerCase()) ||
@@ -140,14 +151,25 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
 
   const content = (
     <div className={embedded ? "space-y-4" : "container max-w-lg mx-auto px-4 py-6 space-y-4"}>
-      <motion.div
-        className="flex items-center justify-between"
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.4 }}
-      >
-        <h1 className="text-2xl font-bold font-display">Lunch</h1>
-      </motion.div>
+      <div className="flex items-center justify-between">
+        <motion.h1
+          className="text-2xl font-bold font-display"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.4 }}
+        >
+          Dagens lunch
+        </motion.h1>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.2 }}
+        >
+          <Button variant="ghost" size="icon" onClick={handleRefresh} aria-label="Uppdatera lunchmenyer">
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+        </motion.div>
+      </div>
 
       <motion.div
         className="relative"
