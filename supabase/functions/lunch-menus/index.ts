@@ -206,31 +206,41 @@ async function fetchRssMenu(rssUrl: string, todayStr: string): Promise<string | 
       return null;
     }
     const xml = await res.text();
-    // Find the item matching today's date (format: DD-MM-YYYY in RSS)
+    // Find the item matching today's date (format: DD-MM-YYYY in title)
     const [y, m, d] = todayStr.split('-');
     const rssDate = `${d}-${m}-${y}`;
     // Split items and find today's
     const items = xml.split('<item>');
     for (const item of items) {
       if (item.includes(rssDate)) {
-        // Extract description content
-        const descMatch = item.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/);
-        if (descMatch) {
-          // Strip HTML tags and decode entities
-          const text = descMatch[1]
-            .replace(/<[^>]+>/g, ' ')
-            .replace(/&ndash;/g, '–')
-            .replace(/&amp;/g, '&')
-            .replace(/&auml;/g, 'ä').replace(/&Auml;/g, 'Ä')
-            .replace(/&ouml;/g, 'ö').replace(/&Ouml;/g, 'Ö')
-            .replace(/&aring;/g, 'å').replace(/&Aring;/g, 'Å')
-            .replace(/&eacute;/g, 'é').replace(/&egrave;/g, 'è')
-            .replace(/&nbsp;/g, ' ')
-            .replace(/&ldquo;/g, '"').replace(/&rdquo;/g, '"')
-            .replace(/\s+/g, ' ')
-            .trim();
-          return text;
+        // Extract description content - may be CDATA or encoded HTML
+        let desc = '';
+        const cdataMatch = item.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/);
+        const plainMatch = item.match(/<description>([\s\S]*?)<\/description>/);
+        if (cdataMatch) {
+          desc = cdataMatch[1];
+        } else if (plainMatch) {
+          desc = plainMatch[1];
         }
+        if (!desc) continue;
+
+        // Decode double-encoded HTML entities first (&amp;ndash; -> &ndash;)
+        const text = desc
+          .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+          .replace(/&amp;/g, '&')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/&ndash;/g, '–').replace(/&mdash;/g, '—')
+          .replace(/&auml;/g, 'ä').replace(/&Auml;/g, 'Ä')
+          .replace(/&ouml;/g, 'ö').replace(/&Ouml;/g, 'Ö')
+          .replace(/&aring;/g, 'å').replace(/&Aring;/g, 'Å')
+          .replace(/&eacute;/g, 'é').replace(/&egrave;/g, 'è')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&ldquo;/g, '"').replace(/&rdquo;/g, '"')
+          .replace(/&amp;/g, '&')
+          .replace(/\s+/g, ' ')
+          .trim();
+        console.log(`RSS content for ${rssDate}: ${text.slice(0, 200)}...`);
+        return text;
       }
     }
     console.log(`No RSS item found for ${rssDate}`);
