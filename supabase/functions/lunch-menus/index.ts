@@ -57,7 +57,7 @@ function buildPrompt(name: string, todayStr: string): string {
   const todayDay = dayNames[todayIdx];
   const todayAbbrev = dayAbbrevs[todayIdx];
 
-  return `Du är en menyextraherare. Extrahera ENBART lunchrätter som serveras IDAG (${todayDay} ${todayStr}) från innehållet för restaurangen "${name}".
+  return `Du är en menyextraherare. Extrahera ALLA rätter som listas på menyn (huvudrätter, soppor, tillbehör, desserter, efterrätter etc.) som serveras IDAG (${todayDay} ${todayStr}) från innehållet för restaurangen "${name}".
 
 IDAG ÄR: ${todayDay} (förkortat: ${todayAbbrev})
 
@@ -77,7 +77,7 @@ REGLER – läs ALLA innan du börjar:
 
 5. UTESLUT rätter som tillhör ANDRA specifika veckodagar. Om det står "Tisdag: Fisk" och idag INTE är tisdag → hoppa över.
 
-6. Inkludera rättens namn OCH beskrivning/tillbehör som en sammanhängande text. Ignorera priser.
+6. Inkludera ALLA rätter som står på menyn, oavsett typ. Soppor, pannkakor, efterrätter och andra tillbehör ska också tas med. Inkludera rättens namn OCH beskrivning/tillbehör som en sammanhängande text. Ignorera priser.
 
 7. DAGSINFORMATION I NAMN: Skriv ut vilka dagar rätten gäller som prefix i namnet:
    - Veckans rätter: "(Hela veckan) Rättnamn – tillbehör"
@@ -100,9 +100,9 @@ async function extractMenuFromText(
 ): Promise<{ name: string; tags?: string[] }[]> {
   let prompt: string;
   if (isPreFilteredForToday) {
-    prompt = `Du är en menyextraherare. Extrahera lunchrätter från innehållet för restaurangen "${name}".
+    prompt = `Du är en menyextraherare. Extrahera ALLA rätter (huvudrätter, soppor, tillbehör, desserter, efterrätter etc.) från innehållet för restaurangen "${name}".
 
-VIKTIGT: Texten nedan innehåller ENBART dagens meny (redan filtrerad). Alla rätter gäller idag. Lägg INTE till prefix som "(Hela veckan)".
+VIKTIGT: Texten nedan innehåller ENBART dagens meny (redan filtrerad). Alla rätter gäller idag. Lägg INTE till prefix som "(Hela veckan)". Inkludera ALLA rätter oavsett typ – soppor, pannkakor, efterrätter och tillbehör ska också tas med.
 
 Svara ENBART med giltig JSON (inga kommentarer, ingen markdown):
 {"dishes":[{"name":"Rättens namn – beskrivning/tillbehör","tags":["vegetarisk"]}]}
