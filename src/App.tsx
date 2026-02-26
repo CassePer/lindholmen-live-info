@@ -23,7 +23,7 @@ function AppLayout() {
   if (!isMobile) {
     // Desktop: single dashboard page, no bottom nav
     return (
-      <div className="flex min-h-svh flex-col">
+      <div className="flex min-h-screen flex-col">
         <Routes>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/admin" element={<AdminPage />} />
@@ -36,7 +36,7 @@ function AppLayout() {
 
   // Mobile: tabbed pages with bottom nav
   return (
-    <div className="flex min-h-svh flex-col">
+    <div className="flex min-h-screen flex-col">
       <InstallBanner />
         <Routes>
           <Route path="/" element={<LunchPage />} />
