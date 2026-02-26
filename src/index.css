@@ -130,3 +130,19 @@
   }
 }
 
+/* Prevent sticky hover on touch-only devices */
+@media (hover: none) and (pointer: coarse) {
+  .hover\:bg-accent:not(:active) {
+    background-color: transparent !important;
+  }
+  .hover\:bg-primary\/90:not(:active) {
+    background-color: hsl(var(--primary)) !important;
+  }
+  .hover\:bg-secondary\/80:not(:active) {
+    background-color: hsl(var(--secondary)) !important;
+  }
+  .hover\:bg-destructive\/90:not(:active) {
+    background-color: hsl(var(--destructive)) !important;
+  }
+}
+
