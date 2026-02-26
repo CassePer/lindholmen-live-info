@@ -2,3 +2,6 @@ project_id = "equmgrsquuqaeymbivhe"
 
 [functions.cameras]
 verify_jwt = false
+
+[functions.admin-auth]
+verify_jwt = false
