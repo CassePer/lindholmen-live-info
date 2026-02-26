@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import { useLunchMenus } from "@/hooks/use-lunch";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -146,10 +147,19 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
     setIsRefreshing(true);
     try {
       const freshData = await getLunchMenus(true);
-      queryClient.setQueryData(["lunch"], freshData);
+      // Check if cooldown response
+      if (freshData && typeof freshData === 'object' && 'cooldown' in freshData) {
+        const cd = freshData as any;
+        toast.info(`Menyerna uppdaterades nyligen. Försök igen om ${cd.minutesLeft} min.`);
+        if (cd.menus) {
+          queryClient.setQueryData(["lunch"], cd.menus);
+        }
+      } else {
+        queryClient.setQueryData(["lunch"], freshData);
+        toast.success("Menyerna har uppdaterats!");
+      }
     } catch (err) {
       console.error("Force refresh failed:", err);
-      // Fall back to normal invalidation
       queryClient.invalidateQueries({ queryKey: ["lunch"] });
     } finally {
       setIsRefreshing(false);
