@@ -370,26 +370,41 @@ Deno.serve(async (req) => {
     const now = new Date();
     const todayKey = getTodayKey(now);
 
-    // If force, delete today's cache first
-    if (force) {
-      console.log(`Force refresh requested – clearing cache for ${todayKey}`);
-      await supabase.from('lunch_menu_cache').delete().eq('week_key', todayKey);
-    }
+    // Check cache for today
+    const { data: cached, error: cacheError } = await supabase
+      .from('lunch_menu_cache')
+      .select('menu_data, created_at')
+      .eq('week_key', todayKey);
 
-    // Check cache for today (skipped if force)
-    if (!force) {
-      const { data: cached, error: cacheError } = await supabase
-        .from('lunch_menu_cache')
-        .select('menu_data')
-        .eq('week_key', todayKey);
-
-      if (!cacheError && cached && cached.length > 0) {
+    if (!cacheError && cached && cached.length > 0) {
+      if (force) {
+        // Check cooldown: only allow force refresh if cache is older than 30 minutes
+        const COOLDOWN_MS = 30 * 60 * 1000;
+        const newest = cached.reduce((a: any, b: any) =>
+          new Date(a.created_at) > new Date(b.created_at) ? a : b
+        );
+        const ageMs = now.getTime() - new Date(newest.created_at).getTime();
+        if (ageMs < COOLDOWN_MS) {
+          const minutesLeft = Math.ceil((COOLDOWN_MS - ageMs) / 60000);
+          console.log(`Force refresh blocked – cache is ${Math.floor(ageMs / 60000)}min old, cooldown ${minutesLeft}min left`);
+          const menus = cached.map((row: any) => row.menu_data);
+          return new Response(JSON.stringify({ cooldown: true, minutesLeft, menus }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        // Cooldown passed – clear cache and re-scrape
+        console.log(`Force refresh allowed – cache is ${Math.floor(ageMs / 60000)}min old`);
+        await supabase.from('lunch_menu_cache').delete().eq('week_key', todayKey);
+      } else {
+        // Normal request – serve from cache
         console.log(`Serving ${cached.length} menus from cache for ${todayKey}`);
-        const menus = cached.map((row: { menu_data: unknown }) => row.menu_data);
+        const menus = cached.map((row: any) => row.menu_data);
         return new Response(JSON.stringify(menus), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
+    } else if (force) {
+      console.log(`Force refresh – no existing cache to check cooldown against`);
     }
 
     // Fetch restaurants from DB
