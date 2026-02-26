@@ -129,3 +129,13 @@
     @apply bg-card/80 backdrop-blur-sm border border-border/50 shadow-sm;
   }
 }
+
+/* Prevent sticky hover/active states on touch devices */
+@media (hover: none) {
+  button:hover,
+  a:hover,
+  [role="button"]:hover {
+    background-color: inherit;
+    color: inherit;
+  }
+}
