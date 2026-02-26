@@ -97,7 +97,7 @@ async function extractMenuFromText(
   apiKey: string,
   todayStr: string
 ): Promise<{ name: string; tags?: string[] }[]> {
-  const prompt = buildPrompt(name, todayStr) + `\n\nText att analysera:\n${markdown.slice(0, 8000)}`;
+  const prompt = buildPrompt(name, todayStr) + `\n\nText att analysera:\n${markdown.slice(0, 15000)}`;
 
   try {
     const res = await fetch(AI_GATEWAY, {
