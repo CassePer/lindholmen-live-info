@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExternalLink, Search, AlertCircle, MapPin, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { getLunchMenus } from "@/services/lunch";
 import { useQueryClient } from "@tanstack/react-query";
 import type { LunchMenu, DietTag } from "@/api/types";
 
@@ -139,9 +140,20 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
   const [search, setSearch] = useState("");
   const { data, isLoading, error } = useLunchMenus();
   const queryClient = useQueryClient();
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const handleRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: ["lunch"] });
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      const freshData = await getLunchMenus(true);
+      queryClient.setQueryData(["lunch"], freshData);
+    } catch (err) {
+      console.error("Force refresh failed:", err);
+      // Fall back to normal invalidation
+      queryClient.invalidateQueries({ queryKey: ["lunch"] });
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const filtered = data?.filter((m) =>
@@ -165,8 +177,8 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2 }}
         >
-          <Button variant="ghost" size="icon" onClick={handleRefresh} aria-label="Uppdatera lunchmenyer">
-            <RefreshCw className="h-4 w-4" />
+          <Button variant="ghost" size="icon" onClick={handleRefresh} disabled={isRefreshing} aria-label="Uppdatera lunchmenyer">
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
           </Button>
         </motion.div>
       </div>

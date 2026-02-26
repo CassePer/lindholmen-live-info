@@ -343,6 +343,17 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Parse force parameter from body or query
+    let force = false;
+    try {
+      const url = new URL(req.url);
+      if (url.searchParams.get('force') === 'true') force = true;
+      if (req.method === 'POST') {
+        const body = await req.json().catch(() => null);
+        if (body?.force) force = true;
+      }
+    } catch { /* ignore parse errors */ }
+
     const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY');
     const lovableKey = Deno.env.get('LOVABLE_API_KEY');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -359,18 +370,26 @@ Deno.serve(async (req) => {
     const now = new Date();
     const todayKey = getTodayKey(now);
 
-    // Check cache for today
-    const { data: cached, error: cacheError } = await supabase
-      .from('lunch_menu_cache')
-      .select('menu_data')
-      .eq('week_key', todayKey);
+    // If force, delete today's cache first
+    if (force) {
+      console.log(`Force refresh requested – clearing cache for ${todayKey}`);
+      await supabase.from('lunch_menu_cache').delete().eq('week_key', todayKey);
+    }
 
-    if (!cacheError && cached && cached.length > 0) {
-      console.log(`Serving ${cached.length} menus from cache for ${todayKey}`);
-      const menus = cached.map((row: { menu_data: unknown }) => row.menu_data);
-      return new Response(JSON.stringify(menus), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    // Check cache for today (skipped if force)
+    if (!force) {
+      const { data: cached, error: cacheError } = await supabase
+        .from('lunch_menu_cache')
+        .select('menu_data')
+        .eq('week_key', todayKey);
+
+      if (!cacheError && cached && cached.length > 0) {
+        console.log(`Serving ${cached.length} menus from cache for ${todayKey}`);
+        const menus = cached.map((row: { menu_data: unknown }) => row.menu_data);
+        return new Response(JSON.stringify(menus), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     // Fetch restaurants from DB
