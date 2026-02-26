@@ -241,21 +241,7 @@ async function fetchRssMenu(rssUrl: string, todayStr: string): Promise<string | 
         }
         if (!desc) continue;
 
-        // Decode double-encoded HTML entities first (&amp;ndash; -> &ndash;)
-        const text = desc
-          .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-          .replace(/&amp;/g, '&')
-          .replace(/<[^>]+>/g, ' ')
-          .replace(/&ndash;/g, '–').replace(/&mdash;/g, '—')
-          .replace(/&auml;/g, 'ä').replace(/&Auml;/g, 'Ä')
-          .replace(/&ouml;/g, 'ö').replace(/&Ouml;/g, 'Ö')
-          .replace(/&aring;/g, 'å').replace(/&Aring;/g, 'Å')
-          .replace(/&eacute;/g, 'é').replace(/&egrave;/g, 'è')
-          .replace(/&nbsp;/g, ' ')
-          .replace(/&ldquo;/g, '"').replace(/&rdquo;/g, '"')
-          .replace(/&amp;/g, '&')
-          .replace(/\s+/g, ' ')
-          .trim();
+        const text = decodeRssHtml(desc);
         console.log(`RSS content for ${rssDate}: ${text.slice(0, 200)}...`);
         return text;
       }
@@ -266,6 +252,89 @@ async function fetchRssMenu(rssUrl: string, todayStr: string): Promise<string | 
     console.error('RSS fetch error:', err);
     return null;
   }
+}
+
+function decodeRssHtml(desc: string): string {
+  return desc
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&ndash;/g, '–').replace(/&mdash;/g, '—')
+    .replace(/&auml;/g, 'ä').replace(/&Auml;/g, 'Ä')
+    .replace(/&ouml;/g, 'ö').replace(/&Ouml;/g, 'Ö')
+    .replace(/&aring;/g, 'å').replace(/&Aring;/g, 'Å')
+    .replace(/&eacute;/g, 'é').replace(/&egrave;/g, 'è')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&ldquo;/g, '"').replace(/&rdquo;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Fetch daily RSS feed (single item, no date matching needed) */
+async function fetchRssDailyMenu(rssUrl: string): Promise<string | null> {
+  try {
+    const res = await fetch(rssUrl);
+    if (!res.ok) {
+      console.error(`RSS daily fetch failed: ${res.status}`);
+      return null;
+    }
+    const xml = await res.text();
+    // Daily feed should have one item with today's menu
+    const itemMatch = xml.match(/<item>([\s\S]*?)<\/item>/);
+    if (!itemMatch) {
+      console.log('No item in daily RSS feed');
+      return null;
+    }
+    const item = itemMatch[1];
+    let desc = '';
+    const cdataMatch = item.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/);
+    const plainMatch = item.match(/<description>([\s\S]*?)<\/description>/);
+    if (cdataMatch) desc = cdataMatch[1];
+    else if (plainMatch) desc = plainMatch[1];
+    if (!desc) return null;
+
+    const text = decodeRssHtml(desc);
+    if (text.length < 20) return null; // Too short = likely empty
+    console.log(`RSS daily content: ${text.slice(0, 200)}...`);
+    return text;
+  } catch (err) {
+    console.error('RSS daily fetch error:', err);
+    return null;
+  }
+}
+
+/** Fetch Compass Group JSON feed */
+async function fetchJsonMenu(jsonUrl: string): Promise<string | null> {
+  try {
+    const res = await fetch(jsonUrl);
+    if (!res.ok) {
+      console.error(`JSON feed fetch failed: ${res.status}`);
+      return null;
+    }
+    const data = await res.json();
+    // Compass Group JSON: array of menu items or nested structure
+    const text = JSON.stringify(data);
+    if (!text || text === '[]' || text === '{}' || text.length < 30) return null;
+    console.log(`JSON feed content (${text.length} chars): ${text.slice(0, 200)}...`);
+    return text;
+  } catch (err) {
+    console.error('JSON feed fetch error:', err);
+    return null;
+  }
+}
+
+/** Derive Compass Group sibling URLs from the rss_url */
+function getCompassGroupUrls(rssUrl: string): { dailyRss: string; jsonFeed: string; weeklyRss: string } | null {
+  const match = rssUrl.match(/(https:\/\/www\.compass-group\.se\/menuapi\/feed\/).*\?(costNumber=\d+&language=\w+)/);
+  if (!match) return null;
+  const base = match[1];
+  const params = match[2];
+  return {
+    dailyRss: `${base}rss/current-day?${params}`,
+    jsonFeed: `${base}json?${params}`,
+    weeklyRss: `${base}rss/current-week?${params}`,
+  };
 }
 
 Deno.serve(async (req) => {
@@ -329,8 +398,33 @@ Deno.serve(async (req) => {
         batch.map(async (r: any) => {
           let dishes: { name: string; tags?: string[] }[] = [];
 
-          // Try RSS feed first if available
-          if (r.rss_url) {
+          // Try Compass Group cascade: daily RSS → JSON → weekly RSS
+          const compassUrls = r.rss_url ? getCompassGroupUrls(r.rss_url) : null;
+          if (compassUrls) {
+            // 1. Daily RSS (pre-filtered for today)
+            const dailyText = await fetchRssDailyMenu(compassUrls.dailyRss);
+            if (dailyText) {
+              console.log(`Using daily RSS for ${r.name}`);
+              dishes = await extractMenuFromText(r.name, dailyText, lovableKey, todayKey, true);
+            }
+            // 2. JSON feed
+            if (dishes.length === 0) {
+              const jsonText = await fetchJsonMenu(compassUrls.jsonFeed);
+              if (jsonText) {
+                console.log(`Using JSON feed for ${r.name}`);
+                dishes = await extractMenuFromText(r.name, jsonText, lovableKey, todayKey, true);
+              }
+            }
+            // 3. Weekly RSS (need to extract today only)
+            if (dishes.length === 0) {
+              const weeklyText = await fetchRssMenu(compassUrls.weeklyRss, todayKey);
+              if (weeklyText) {
+                console.log(`Using weekly RSS for ${r.name}`);
+                dishes = await extractMenuFromText(r.name, weeklyText, lovableKey, todayKey, true);
+              }
+            }
+          } else if (r.rss_url) {
+            // Generic RSS feed
             const rssText = await fetchRssMenu(r.rss_url, todayKey);
             if (rssText) {
               console.log(`Using RSS feed for ${r.name}`);
