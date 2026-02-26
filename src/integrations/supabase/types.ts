@@ -63,6 +63,7 @@ export type Database = {
           id: string
           menu_url: string
           name: string
+          rss_url: string | null
           website_url: string
         }
         Insert: {
@@ -71,6 +72,7 @@ export type Database = {
           id?: string
           menu_url: string
           name: string
+          rss_url?: string | null
           website_url: string
         }
         Update: {
@@ -79,6 +81,7 @@ export type Database = {
           id?: string
           menu_url?: string
           name?: string
+          rss_url?: string | null
           website_url?: string
         }
         Relationships: []
