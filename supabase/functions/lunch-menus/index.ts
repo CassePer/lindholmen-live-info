@@ -198,6 +198,49 @@ async function extractMenuFromScreenshot(
 
 const MIN_MARKDOWN_LENGTH = 200;
 
+async function fetchRssMenu(rssUrl: string, todayStr: string): Promise<string | null> {
+  try {
+    const res = await fetch(rssUrl);
+    if (!res.ok) {
+      console.error(`RSS fetch failed: ${res.status}`);
+      return null;
+    }
+    const xml = await res.text();
+    // Find the item matching today's date (format: DD-MM-YYYY in RSS)
+    const [y, m, d] = todayStr.split('-');
+    const rssDate = `${d}-${m}-${y}`;
+    // Split items and find today's
+    const items = xml.split('<item>');
+    for (const item of items) {
+      if (item.includes(rssDate)) {
+        // Extract description content
+        const descMatch = item.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/);
+        if (descMatch) {
+          // Strip HTML tags and decode entities
+          const text = descMatch[1]
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/&ndash;/g, '–')
+            .replace(/&amp;/g, '&')
+            .replace(/&auml;/g, 'ä').replace(/&Auml;/g, 'Ä')
+            .replace(/&ouml;/g, 'ö').replace(/&Ouml;/g, 'Ö')
+            .replace(/&aring;/g, 'å').replace(/&Aring;/g, 'Å')
+            .replace(/&eacute;/g, 'é').replace(/&egrave;/g, 'è')
+            .replace(/&nbsp;/g, ' ')
+            .replace(/&ldquo;/g, '"').replace(/&rdquo;/g, '"')
+            .replace(/\s+/g, ' ')
+            .trim();
+          return text;
+        }
+      }
+    }
+    console.log(`No RSS item found for ${rssDate}`);
+    return null;
+  } catch (err) {
+    console.error('RSS fetch error:', err);
+    return null;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -257,23 +300,33 @@ Deno.serve(async (req) => {
       const batch = restaurants.slice(i, i + BATCH_SIZE);
       const results = await Promise.all(
         batch.map(async (r: any) => {
-          const { markdown, screenshot } = await scrapeUrl(r.menu_url, firecrawlKey);
-
           let dishes: { name: string; tags?: string[] }[] = [];
 
-          // Try markdown first if we got enough content
-          if (markdown && markdown.length >= MIN_MARKDOWN_LENGTH) {
-            dishes = await extractMenuFromText(r.name, markdown, lovableKey, todayKey);
+          // Try RSS feed first if available
+          if (r.rss_url) {
+            const rssText = await fetchRssMenu(r.rss_url, todayKey);
+            if (rssText) {
+              console.log(`Using RSS feed for ${r.name}`);
+              dishes = await extractMenuFromText(r.name, rssText, lovableKey, todayKey);
+            }
           }
 
-          // Fallback to screenshot/vision if markdown yielded nothing
-          if (dishes.length === 0 && screenshot) {
-            console.log(`Falling back to vision for ${r.name}`);
-            dishes = await extractMenuFromScreenshot(r.name, screenshot, lovableKey, todayKey);
-          }
+          // Fall back to Firecrawl scraping
+          if (dishes.length === 0) {
+            const { markdown, screenshot } = await scrapeUrl(r.menu_url, firecrawlKey);
 
-          if (dishes.length === 0 && !markdown && !screenshot) {
-            console.log(`No content scraped for ${r.name}`);
+            if (markdown && markdown.length >= MIN_MARKDOWN_LENGTH) {
+              dishes = await extractMenuFromText(r.name, markdown, lovableKey, todayKey);
+            }
+
+            if (dishes.length === 0 && screenshot) {
+              console.log(`Falling back to vision for ${r.name}`);
+              dishes = await extractMenuFromScreenshot(r.name, screenshot, lovableKey, todayKey);
+            }
+
+            if (dishes.length === 0 && !markdown && !screenshot) {
+              console.log(`No content scraped for ${r.name}`);
+            }
           }
 
           return {
