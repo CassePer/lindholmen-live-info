@@ -130,12 +130,3 @@
   }
 }
 
-/* Prevent sticky hover/active states on touch devices */
-@media (hover: none) {
-  button:hover,
-  a:hover,
-  [role="button"]:hover {
-    background-color: inherit;
-    color: inherit;
-  }
-}
