@@ -148,9 +148,11 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
         transition={{ duration: 0.4 }}
       >
         <h1 className="text-2xl font-bold font-display">Lunch</h1>
-        <Link to="/admin" className="text-muted-foreground hover:text-primary transition-colors">
-          <Settings className="h-5 w-5" />
-        </Link>
+        {embedded && (
+          <Link to="/admin" className="text-muted-foreground hover:text-primary transition-colors">
+            <Settings className="h-5 w-5" />
+          </Link>
+        )}
       </motion.div>
 
       <motion.div

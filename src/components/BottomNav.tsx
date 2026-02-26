@@ -1,5 +1,5 @@
-import { NavLink, useLocation } from "react-router-dom";
-import { UtensilsCrossed, Clock, Camera } from "lucide-react";
+import { NavLink, useLocation, Link } from "react-router-dom";
+import { UtensilsCrossed, Clock, Camera, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { motion } from "framer-motion";
@@ -46,7 +46,10 @@ export default function BottomNav() {
             </NavLink>
           );
         })}
-        <div className="flex items-center pl-1 pr-2">
+        <div className="flex items-center gap-1 pl-1 pr-2">
+          <Link to="/admin" className="text-muted-foreground hover:text-primary transition-colors p-2">
+            <Settings className="h-4 w-4" />
+          </Link>
           <ThemeToggle />
         </div>
       </div>

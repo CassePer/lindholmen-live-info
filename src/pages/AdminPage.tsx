@@ -134,8 +134,10 @@ export default function AdminPage() {
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [menuUrl, setMenuUrl] = useState("");
   const [refreshInterval, setRefreshInterval] = useState<string | null>(null);
+  const [lunchHour, setLunchHour] = useState<string | null>(null);
 
   const currentInterval = refreshInterval ?? settings?.departure_refresh_interval ?? "60";
+  const currentLunchHour = lunchHour ?? settings?.lunch_auto_refresh_hour ?? "10";
 
   const addMutation = useMutation({
     mutationFn: async () => {
@@ -204,11 +206,11 @@ export default function AdminPage() {
     onError: () => toast.error("Kunde inte rensa cachen"),
   });
 
-  const saveSettingsMutation = useMutation({
-    mutationFn: async () => {
+  const saveSettingMutation = useMutation({
+    mutationFn: async ({ key, value }: { key: string; value: string }) => {
       const { data, error } = await supabase.functions.invoke("admin-settings", {
         method: "PUT",
-        body: { key: "departure_refresh_interval", value: currentInterval },
+        body: { key, value },
       });
       if (error) throw error;
       return data;
@@ -247,7 +249,7 @@ export default function AdminPage() {
               <label className="text-sm font-medium mb-1 block">
                 Avgångar – uppdateringsintervall (sekunder)
               </label>
-              <div className="flex gap-2">
+                <div className="flex gap-2">
                 <Input
                   type="number"
                   min="10"
@@ -258,12 +260,37 @@ export default function AdminPage() {
                 />
                 <Button
                   size="sm"
-                  onClick={() => saveSettingsMutation.mutate()}
-                  disabled={saveSettingsMutation.isPending}
+                  onClick={() => saveSettingMutation.mutate({ key: "departure_refresh_interval", value: currentInterval })}
+                  disabled={saveSettingMutation.isPending}
                 >
-                  {saveSettingsMutation.isPending ? "Sparar..." : "Spara"}
+                  {saveSettingMutation.isPending ? "Sparar..." : "Spara"}
                 </Button>
               </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">
+                Lunch – automatisk uppdatering (timme, 0–23)
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  min="0"
+                  max="23"
+                  value={currentLunchHour}
+                  onChange={(e) => setLunchHour(e.target.value)}
+                  className="w-32"
+                />
+                <Button
+                  size="sm"
+                  onClick={() => saveSettingMutation.mutate({ key: "lunch_auto_refresh_hour", value: currentLunchHour })}
+                  disabled={saveSettingMutation.isPending}
+                >
+                  {saveSettingMutation.isPending ? "Sparar..." : "Spara"}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Lunchmenyer hämtas om automatiskt vid denna tidpunkt varje dag.
+              </p>
             </div>
           </CardContent>
         </Card>
