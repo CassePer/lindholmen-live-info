@@ -1,63 +1,30 @@
 
-# Fix: "Rensa cache"-knappen och DELETE-anrop i Admin
+## Uppdatera AI-prompten for att inkludera alla ratter
 
-## Problem
-`supabase.functions.invoke("admin-restaurants?clear_cache=true", { method: "DELETE" })` fungerar inte -- Supabase SDK tolkar `admin-restaurants?clear_cache=true` som funktionsnamnet, inte som namn + query-parametrar. Samma problem galler aven radering av restauranger (`admin-restaurants?id=...`).
+### Problem
+AI-prompten instruerar modellen att extrahera "lunchratter", vilket kan leda till att soppor, pannkakor, efterratter och tillbehor filtreras bort (t.ex. Pier11:s "Creamy mushroom soup, pancake, whipped cream and jam").
 
-## Losning
-Flytta parametrarna fran query string till request body, och uppdatera edge function att lasa fran body istallet for URL-parametrar vid DELETE.
+### Andringar
 
-### 1. Uppdatera edge function (`supabase/functions/admin-restaurants/index.ts`)
+**Fil:** `supabase/functions/lunch-menus/index.ts`
 
-Andra DELETE-hanteringen sa att den laser `id` och `clear_cache` fran request body istallet for URL query params:
+Uppdatera tre prompter:
 
-```typescript
-if (req.method === 'DELETE') {
-  const body = await req.json().catch(() => ({}));
-  const clearCache = body.clear_cache;
-  const id = body.id;
+1. **`buildPrompt`-funktionen (huvudprompten)** - Rad 59 och regel 6:
+   - Andra "Extrahera ENBART lunchratter" till "Extrahera ALLA ratter som listas pa menyn (huvudratter, soppor, tillbehor, desserter, efterratter etc.)"
+   - Lagga till en ny regel: "Inkludera ALLA ratter som star pa menyn, oavsett typ. Soppor, pannkakor, efterratter och andra tillbehor ska ocksa tas med."
 
-  if (clearCache) {
-    // clear lunch_menu_cache (same logic as before)
-  }
+2. **`isPreFilteredForToday`-prompten** (rad 103):
+   - Andra "Extrahera lunchratter" till "Extrahera ALLA ratter"
+   - Lagga till instruktion om att inkludera soppor, tillbehor och desserter
 
-  if (!id) {
-    return 400 error;
-  }
-  // delete restaurant by id (same logic as before)
-}
-```
+3. **Vision-prompten** (`extractMenuFromScreenshot`, rad ~167):
+   - Redan anvander `buildPrompt` som bas, sa den far andringen automatiskt
 
-### 2. Uppdatera AdminPage.tsx -- clearCacheMutation
+Efter andring: rensa cachen for Pier11 och verifiera att alla 4 ratter kommer med.
 
-Andra fran:
-```typescript
-supabase.functions.invoke("admin-restaurants?clear_cache=true", { method: "DELETE" })
-```
-Till:
-```typescript
-supabase.functions.invoke("admin-restaurants", {
-  method: "DELETE",
-  body: { clear_cache: true },
-})
-```
-
-### 3. Uppdatera AdminPage.tsx -- deleteMutation
-
-Andra fran:
-```typescript
-supabase.functions.invoke(`admin-restaurants?id=${id}`, { method: "DELETE" })
-```
-Till:
-```typescript
-supabase.functions.invoke("admin-restaurants", {
-  method: "DELETE",
-  body: { id },
-})
-```
-
-### 4. Deploya och testa
-- Deploya uppdaterad edge function
-- Testa att "Rensa cache"-knappen ger "Cache rensad" toast
-- Testa att radering av restauranger fungerar
-- Verifiera att nya menyer hamtas efter cache-rensning
+### Tekniska detaljer
+- Andringarna ar begransade till prompttexterna i edge-funktionen
+- Ingen databasandring kravs
+- Edge-funktionen behover omdistribueras
+- Cachen for Pier11 maste rensas for att testa
