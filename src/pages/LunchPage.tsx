@@ -3,9 +3,8 @@ import { useLunchMenus } from "@/hooks/use-lunch";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ExternalLink, Search, AlertCircle, MapPin, Settings } from "lucide-react";
+import { ExternalLink, Search, AlertCircle, MapPin } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Link } from "react-router-dom";
 import type { LunchMenu, DietTag } from "@/api/types";
 
 const TAG_LABELS: Record<DietTag, string> = {
@@ -148,11 +147,6 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
         transition={{ duration: 0.4 }}
       >
         <h1 className="text-2xl font-bold font-display">Lunch</h1>
-        {embedded && (
-          <Link to="/admin" className="text-muted-foreground hover:text-primary transition-colors">
-            <Settings className="h-5 w-5" />
-          </Link>
-        )}
       </motion.div>
 
       <motion.div
