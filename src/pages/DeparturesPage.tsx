@@ -248,9 +248,8 @@ export default function DeparturesPage({ embedded }: { embedded?: boolean }) {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.2 }}
           >
-            <Button variant="outline" size="sm" onClick={handleRefresh} aria-label="Uppdatera avgångar" className="hover-scale">
-              <RefreshCw className="h-4 w-4 mr-1" />
-              Uppdatera
+            <Button variant="ghost" size="icon" onClick={handleRefresh} aria-label="Uppdatera avgångar">
+              <RefreshCw className="h-4 w-4" />
             </Button>
           </motion.div>
         </div>
