@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useDepartures } from "@/hooks/use-departures";
+import { Input } from "@/components/ui/input";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -221,6 +222,7 @@ export default function DeparturesPage({ embedded }: { embedded?: boolean }) {
   const { data: settings } = useAppSettings();
   const intervalSec = settings?.departure_refresh_interval ?? "60";
   const queryClient = useQueryClient();
+  const [search, setSearch] = useState("");
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ["departures"] });
@@ -256,6 +258,14 @@ export default function DeparturesPage({ embedded }: { embedded?: boolean }) {
 
         <p className="text-sm text-muted-foreground font-medium">{stopName}</p>
 
+        <Input
+          type="search"
+          placeholder="Sök linje, destination..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="h-9"
+        />
+
         {updatedAtStr && (
           <p className="text-xs text-muted-foreground">Senast uppdaterad: {updatedAtStr}</p>
         )}
@@ -281,7 +291,18 @@ export default function DeparturesPage({ embedded }: { embedded?: boolean }) {
           </div>
         )}
 
-        {data && data.departures.length > 0 && <GroupedDepartures departures={data.departures} />}
+        {data && data.departures.length > 0 && (
+          <GroupedDepartures
+            departures={
+              search.trim()
+                ? data.departures.filter((d) => {
+                    const q = search.toLowerCase();
+                    return d.line.toLowerCase().includes(q) || d.destination.toLowerCase().includes(q) || d.transportType.toLowerCase().includes(q);
+                  })
+                : data.departures
+            }
+          />
+        )}
 
 
         <p className="text-xs text-muted-foreground text-center pt-2 pb-8">
