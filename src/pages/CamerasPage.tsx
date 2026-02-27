@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useCameras } from "@/hooks/use-cameras";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, ExternalLink, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -101,6 +102,7 @@ function CameraModal({ camera, onClose }: { camera: Camera; onClose: () => void 
 export default function CamerasPage({ embedded }: { embedded?: boolean }) {
   const { data, isLoading, error } = useCameras();
   const [selected, setSelected] = useState<Camera | null>(null);
+  const [search, setSearch] = useState("");
 
   const content = (
     <div className={embedded ? "space-y-4" : "container max-w-lg mx-auto px-4 py-6 space-y-4"}>
@@ -113,6 +115,14 @@ export default function CamerasPage({ embedded }: { embedded?: boolean }) {
           Kameror
         </motion.h1>
         <p className="text-sm text-muted-foreground">Trafikkameror i Göteborg</p>
+
+        <Input
+          type="search"
+          placeholder="Sök kamera..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="h-9"
+        />
 
         {isLoading && <CameraSkeleton />}
 
@@ -128,9 +138,16 @@ export default function CamerasPage({ embedded }: { embedded?: boolean }) {
           </motion.div>
         )}
 
-        {data && (
+        {data && (() => {
+          const filtered = search.trim()
+            ? data.filter((c) => {
+                const q = search.toLowerCase();
+                return c.name.toLowerCase().includes(q) || c.location.toLowerCase().includes(q) || (c.description?.toLowerCase().includes(q) ?? false);
+              })
+            : data;
+          return (
           <div className="grid grid-cols-2 gap-3">
-            {data.map((camera, i) => (
+            {filtered.map((camera, i) => (
               <motion.button
                 key={camera.id}
                 onClick={() => setSelected(camera)}
@@ -161,7 +178,8 @@ export default function CamerasPage({ embedded }: { embedded?: boolean }) {
               </motion.button>
             ))}
           </div>
-        )}
+          );
+        })()}
 
         <AnimatePresence>
           {selected && <CameraModal camera={selected} onClose={() => setSelected(null)} />}
