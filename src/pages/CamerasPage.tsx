@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useCameras } from "@/hooks/use-cameras";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/SearchInput";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, ExternalLink, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -116,12 +116,10 @@ export default function CamerasPage({ embedded }: { embedded?: boolean }) {
         </motion.h1>
         <p className="text-sm text-muted-foreground">Trafikkameror i Göteborg</p>
 
-        <Input
-          type="search"
+        <SearchInput
           placeholder="Sök kamera..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-9"
+          onChange={setSearch}
         />
 
         {isLoading && <CameraSkeleton />}

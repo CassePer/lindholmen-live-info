@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useDepartures } from "@/hooks/use-departures";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/SearchInput";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -258,12 +258,10 @@ export default function DeparturesPage({ embedded }: { embedded?: boolean }) {
 
         <p className="text-sm text-muted-foreground font-medium">{stopName}</p>
 
-        <Input
-          type="search"
+        <SearchInput
           placeholder="Sök linje, destination..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-9"
+          onChange={setSearch}
         />
 
         {updatedAtStr && (
