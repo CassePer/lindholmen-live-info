@@ -2,6 +2,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useLunchMenus } from "@/hooks/use-lunch";
 import { SearchInput } from "@/components/SearchInput";
+import { HighlightText } from "@/components/HighlightText";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -81,7 +82,7 @@ const cardVariants = {
   }),
 };
 
-function RestaurantCard({ menu }: { menu: LunchMenu }) {
+function RestaurantCard({ menu, search }: { menu: LunchMenu; search: string }) {
   const mapsUrl = menu.address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(menu.address)}`
     : undefined;
@@ -91,7 +92,9 @@ function RestaurantCard({ menu }: { menu: LunchMenu }) {
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="space-y-1">
-            <CardTitle className="text-lg font-display">{menu.restaurantName}</CardTitle>
+            <CardTitle className="text-lg font-display">
+              <HighlightText text={menu.restaurantName} query={search} />
+            </CardTitle>
             {menu.address && mapsUrl && (
               <a
                 href={mapsUrl}
@@ -121,7 +124,7 @@ function RestaurantCard({ menu }: { menu: LunchMenu }) {
             {menu.dishes.map((dish, i) => (
               <li key={i} className="flex items-start gap-2 text-sm">
                 <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary" />
-                <span className="flex-1">{dish.name}</span>
+                <HighlightText text={dish.name} query={search} className="flex-1" />
                 {dish.tags?.map((tag) => <DishTag key={tag} tag={tag} />)}
               </li>
             ))}
@@ -144,11 +147,12 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
   const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  const activeSearch = showSearch ? search : "";
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
       const freshData = await getLunchMenus(true);
-      // Check if cooldown response
       if (freshData && typeof freshData === 'object' && 'cooldown' in freshData) {
         const cd = freshData as any;
         toast.info(`Menyerna uppdaterades nyligen. Försök igen om ${cd.minutesLeft} min.`);
@@ -168,8 +172,8 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
   };
 
   const filtered = data?.filter((m) =>
-    m.restaurantName.toLowerCase().includes(search.toLowerCase()) ||
-    m.dishes.some((d) => d.name.toLowerCase().includes(search.toLowerCase()))
+    m.restaurantName.toLowerCase().includes(activeSearch.toLowerCase()) ||
+    m.dishes.some((d) => d.name.toLowerCase().includes(activeSearch.toLowerCase()))
   );
 
   const content = (
@@ -211,7 +215,7 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
       ) : error ? (
         <ErrorState message="Kunde inte hämta dagens menyer. Försök igen senare." />
       ) : !filtered?.length ? (
-        <ErrorState message={search ? `Inga resultat för "${search}".` : "Inga menyer hittades för idag."} />
+        <ErrorState message={activeSearch ? `Inga resultat för "${activeSearch}".` : "Inga menyer hittades för idag."} />
       ) : (
         <div className="space-y-4">
           <AnimatePresence mode="popLayout">
@@ -225,7 +229,7 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
                 exit={{ opacity: 0, scale: 0.95 }}
                 layout
               >
-                <RestaurantCard menu={menu} />
+                <RestaurantCard menu={menu} search={activeSearch} />
               </motion.div>
             ))}
           </AnimatePresence>
