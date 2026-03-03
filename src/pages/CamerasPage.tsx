@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback } from "react";
 import { useCameras } from "@/hooks/use-cameras";
 import { Card, CardContent } from "@/components/ui/card";
 import { SearchInput } from "@/components/SearchInput";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, ExternalLink, X } from "lucide-react";
+import { AlertCircle, ExternalLink, X, Search as SearchIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Camera } from "@/api/types";
 
@@ -103,24 +104,32 @@ export default function CamerasPage({ embedded }: { embedded?: boolean }) {
   const { data, isLoading, error } = useCameras();
   const [selected, setSelected] = useState<Camera | null>(null);
   const [search, setSearch] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
 
   const content = (
     <div className={embedded ? "space-y-4" : "container max-w-lg mx-auto px-4 py-6 space-y-4"}>
-        <motion.h1
-          className="text-2xl font-bold font-display"
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.4 }}
-        >
-          Kameror
-        </motion.h1>
-        <p className="text-sm text-muted-foreground">Trafikkameror i Göteborg</p>
+        <div className="flex items-center justify-between">
+          <motion.h1
+            className="text-2xl font-bold font-display"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.4 }}
+          >
+            Kameror
+            <span className="text-sm font-normal text-muted-foreground ml-2">Göteborg</span>
+          </motion.h1>
+          <Button variant="ghost" size="icon" onClick={() => { setShowSearch((v) => !v); if (showSearch) setSearch(""); }} aria-label="Sök kameror">
+            <SearchIcon className="h-4 w-4" />
+          </Button>
+        </div>
 
-        <SearchInput
-          placeholder="Sök kamera..."
-          value={search}
-          onChange={setSearch}
-        />
+        <AnimatePresence>
+          {showSearch && (
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}>
+              <SearchInput placeholder="Sök kamera..." value={search} onChange={setSearch} />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {isLoading && <CameraSkeleton />}
 
