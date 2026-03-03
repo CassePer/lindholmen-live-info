@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (req.method === 'PUT') {
+    if (req.method === 'PUT' || req.method === 'POST') {
       const body = await req.json();
       const { key, value } = body;
       if (!key || value === undefined) {
