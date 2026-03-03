@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useDepartures } from "@/hooks/use-departures";
 import { SearchInput } from "@/components/SearchInput";
+import { HighlightText } from "@/components/HighlightText";
 import { useAppSettings } from "@/hooks/use-app-settings";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +27,12 @@ const TRANSPORT_COLORS: Record<TransportType, string> = {
   Buss: "bg-bus text-primary-foreground",
 };
 
+const TRANSPORT_STOP: Record<string, string> = {
+  Färja: "Lindholmspiren",
+  Spårvagn: "Lindholmen",
+  Buss: "Lindholmen",
+};
+
 const INITIAL_VISIBLE = 5;
 
 function DepartureSkeleton() {
@@ -44,7 +51,7 @@ function DepartureSkeleton() {
   );
 }
 
-function DepartureRow({ dep, index }: { dep: Departure; index: number }) {
+function DepartureRow({ dep, index, search }: { dep: Departure; index: number; search: string }) {
   const time = dep.estimatedTime ?? dep.scheduledTime;
   const hasDelay = dep.delayMinutes > 0;
   const colorClass = TRANSPORT_COLORS[dep.transportType] ?? "bg-muted text-muted-foreground";
@@ -66,7 +73,7 @@ function DepartureRow({ dep, index }: { dep: Departure; index: number }) {
         <Flag className="h-4 w-4 text-ferry shrink-0" fill="currentColor" aria-label="Betalfärja" />
       )}
       <div className="flex-1 min-w-0">
-        <p className="text-sm truncate">{dep.destination}</p>
+        <HighlightText text={dep.destination} query={search} className="text-sm truncate block" />
       </div>
       <div className="flex items-center gap-2">
         {hasDelay && (
@@ -103,16 +110,14 @@ function splitDepartures(items: Departure[]): { past: Departure[]; upcoming: Dep
   return { past, upcoming };
 }
 
-function GroupedDepartures({ departures }: { departures: Departure[] }) {
+function GroupedDepartures({ departures, search }: { departures: Departure[]; search: string }) {
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
-  // Always show all three transport types, even if empty
   const grouped = TRANSPORT_ORDER.map((type) => ({
     type,
     items: departures.filter((d) => d.transportType === type),
   }));
 
-  // Also include transport types not in TRANSPORT_ORDER (e.g. "Tåg")
   const knownTypes = new Set(TRANSPORT_ORDER);
   const extraGroups = [...new Set(departures.map(d => d.transportType))]
     .filter(t => !knownTypes.has(t))
@@ -137,6 +142,7 @@ function GroupedDepartures({ departures }: { departures: Departure[] }) {
         const defaultVisible = upcoming.slice(0, INITIAL_VISIBLE);
         const visibleUpcoming = isExpanded ? upcoming : defaultVisible;
         const hasMore = upcoming.length > INITIAL_VISIBLE;
+        const stopName = TRANSPORT_STOP[group.type] ?? "";
 
         return (
           <motion.div
@@ -150,6 +156,9 @@ function GroupedDepartures({ departures }: { departures: Departure[] }) {
                 <CardTitle className="text-base flex items-center gap-2 font-display">
                   {TRANSPORT_ICON[group.type] ?? <Bus className="h-5 w-5" />}
                   {group.type}
+                  {stopName && (
+                    <span className="text-xs text-muted-foreground font-normal">{stopName}</span>
+                  )}
                   <span className="text-xs text-muted-foreground font-normal ml-auto">
                     {upcoming.length > 0
                       ? `${upcoming.length} kommande`
@@ -170,12 +179,12 @@ function GroupedDepartures({ departures }: { departures: Departure[] }) {
                         <div className="flex items-center gap-1 mb-1">
                           <span className="text-xs text-muted-foreground font-medium">Senaste avgång</span>
                         </div>
-                        <DepartureRow dep={lastDeparture} index={0} />
+                        <DepartureRow dep={lastDeparture} index={0} search={search} />
                         <div className="border-b-2 border-border my-2" />
                       </div>
                     )}
                     {visibleUpcoming.map((dep, i) => (
-                      <DepartureRow key={dep.id} dep={dep} index={i} />
+                      <DepartureRow key={dep.id} dep={dep} index={i} search={search} />
                     ))}
                   </AnimatePresence>
                 </div>
@@ -226,6 +235,8 @@ export default function DeparturesPage({ embedded }: { embedded?: boolean }) {
   const [search, setSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
 
+  const activeSearch = showSearch ? search : "";
+
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ["departures"] });
   };
@@ -233,8 +244,6 @@ export default function DeparturesPage({ embedded }: { embedded?: boolean }) {
   const updatedAtStr = dataUpdatedAt
     ? new Date(dataUpdatedAt).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })
     : null;
-
-  const stopName = data?.stopName || "Lindholmspiren";
 
   const content = (
     <div className={embedded ? "space-y-4" : "container max-w-lg mx-auto px-4 py-6 space-y-4"}>
@@ -246,7 +255,7 @@ export default function DeparturesPage({ embedded }: { embedded?: boolean }) {
             transition={{ duration: 0.4 }}
           >
             Avgångar
-            <span className="text-sm font-normal text-muted-foreground ml-2">{stopName}{updatedAtStr ? ` · ${updatedAtStr}` : ""}</span>
+            {updatedAtStr && <span className="text-sm font-normal text-muted-foreground ml-2">{updatedAtStr}</span>}
           </motion.h1>
           <motion.div
             className="flex items-center gap-1"
@@ -294,10 +303,11 @@ export default function DeparturesPage({ embedded }: { embedded?: boolean }) {
 
         {data && data.departures.length > 0 && (
           <GroupedDepartures
+            search={activeSearch}
             departures={
-              search.trim()
+              activeSearch.trim()
                 ? data.departures.filter((d) => {
-                    const q = search.toLowerCase();
+                    const q = activeSearch.toLowerCase();
                     return d.line.toLowerCase().includes(q) || d.destination.toLowerCase().includes(q) || d.transportType.toLowerCase().includes(q);
                   })
                 : data.departures

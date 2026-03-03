@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useCameras } from "@/hooks/use-cameras";
 import { Card, CardContent } from "@/components/ui/card";
 import { SearchInput } from "@/components/SearchInput";
+import { HighlightText } from "@/components/HighlightText";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, ExternalLink, X, Search as SearchIcon } from "lucide-react";
@@ -106,6 +107,8 @@ export default function CamerasPage({ embedded }: { embedded?: boolean }) {
   const [search, setSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
 
+  const activeSearch = showSearch ? search : "";
+
   const content = (
     <div className={embedded ? "space-y-4" : "container max-w-lg mx-auto px-4 py-6 space-y-4"}>
         <div className="flex items-center justify-between">
@@ -146,9 +149,9 @@ export default function CamerasPage({ embedded }: { embedded?: boolean }) {
         )}
 
         {data && (() => {
-          const filtered = search.trim()
+          const filtered = activeSearch.trim()
             ? data.filter((c) => {
-                const q = search.toLowerCase();
+                const q = activeSearch.toLowerCase();
                 return c.name.toLowerCase().includes(q) || c.location.toLowerCase().includes(q) || (c.description?.toLowerCase().includes(q) ?? false);
               })
             : data;
@@ -175,7 +178,7 @@ export default function CamerasPage({ embedded }: { embedded?: boolean }) {
                       loading="lazy"
                     />
                     <div className="p-2.5">
-                      <p className="text-sm font-medium truncate font-display">{camera.name}</p>
+                      <HighlightText text={camera.name} query={activeSearch} className="text-sm font-medium truncate block font-display" />
                       <p className="text-xs text-muted-foreground">
                         {new Date(camera.updatedAt).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit", hour12: false })}
                       </p>
