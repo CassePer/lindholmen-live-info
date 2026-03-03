@@ -250,7 +250,7 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
 
   const saveSettingMutation = useMutation({
     mutationFn: async ({ key, value }: { key: string; value: string }) => {
-      const { data, error } = await supabase.functions.invoke("admin-settings", { method: "PUT", body: { key, value } });
+      const { data, error } = await supabase.functions.invoke("admin-settings", { method: "POST", body: { key, value } });
       if (error) throw error;
       return data;
     },
