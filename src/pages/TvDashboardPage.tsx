@@ -9,9 +9,11 @@ export default function TvDashboardPage({ iframeUrl }: TvDashboardPageProps) {
   return (
     <main className="flex h-screen overflow-hidden">
       {/* Left half: Lunch + Departures */}
-      <div className="w-1/2 h-full overflow-auto border-r border-border">
-        <div className="p-4 space-y-4">
+      <div className="w-1/2 h-full flex border-r border-border">
+        <div className="w-1/2 h-full overflow-auto border-r border-border/50 p-4">
           <LunchPage embedded />
+        </div>
+        <div className="w-1/2 h-full overflow-auto p-4">
           <DeparturesPage embedded />
         </div>
       </div>
