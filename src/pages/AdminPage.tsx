@@ -200,6 +200,8 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
   const [menuUrl, setMenuUrl] = useState("");
   const [refreshInterval, setRefreshInterval] = useState<string | null>(null);
   const [lunchHour, setLunchHour] = useState<string | null>(null);
+  const [tvIpRange, setTvIpRange] = useState<string | null>(null);
+  const [tvIframeUrl, setTvIframeUrl] = useState<string | null>(null);
 
   const currentInterval = refreshInterval ?? settings?.departure_refresh_interval ?? "60";
   const currentLunchHour = lunchHour ?? settings?.lunch_auto_refresh_hour ?? "10";
@@ -292,6 +294,25 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground mt-1">Lunchmenyer hämtas om automatiskt vid denna tidpunkt varje dag.</p>
+            </div>
+            <div className="border-t pt-3 mt-3">
+              <label className="text-sm font-medium mb-1 block">TV-läge – IP-range (CIDR, kommaseparerat)</label>
+              <div className="flex gap-2">
+                <Input placeholder="t.ex. 192.168.1.0/24, 10.0.0.5" value={tvIpRange ?? settings?.tv_ip_range ?? ""} onChange={(e) => setTvIpRange(e.target.value)} />
+                <Button size="sm" onClick={() => saveSettingMutation.mutate({ key: "tv_ip_range", value: tvIpRange ?? "" })} disabled={saveSettingMutation.isPending}>
+                  {saveSettingMutation.isPending ? "Sparar..." : "Spara"}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Klienter inom detta IP-range får TV-layouten automatiskt. Stöder även ?mode=tv i URL:en.</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">TV-läge – extern URL (iframe, höger halva)</label>
+              <div className="flex gap-2">
+                <Input placeholder="https://example.com" type="url" value={tvIframeUrl ?? settings?.tv_iframe_url ?? ""} onChange={(e) => setTvIframeUrl(e.target.value)} />
+                <Button size="sm" onClick={() => saveSettingMutation.mutate({ key: "tv_iframe_url", value: tvIframeUrl ?? "" })} disabled={saveSettingMutation.isPending}>
+                  {saveSettingMutation.isPending ? "Sparar..." : "Spara"}
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

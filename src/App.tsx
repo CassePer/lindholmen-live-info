@@ -9,16 +9,31 @@ import LunchPage from "@/pages/LunchPage";
 import DeparturesPage from "@/pages/DeparturesPage";
 import CamerasPage from "@/pages/CamerasPage";
 import DashboardPage from "@/pages/DashboardPage";
+import TvDashboardPage from "@/pages/TvDashboardPage";
 import AdminPage from "@/pages/AdminPage";
 import InstallPage from "@/pages/InstallPage";
 import NotFound from "@/pages/NotFound";
 import { InstallBanner } from "@/components/InstallBanner";
 import { useIsMobile } from "@/hooks/use-mobile";
-
+import { useTvMode } from "@/hooks/use-tv-mode";
 const queryClient = new QueryClient();
 
 function AppLayout() {
   const isMobile = useIsMobile();
+  const { isTv, iframeUrl } = useTvMode();
+
+  if (!isMobile && isTv) {
+    // TV mode: split-screen layout
+    return (
+      <div className="flex min-h-screen flex-col">
+        <Routes>
+          <Route path="/" element={<TvDashboardPage iframeUrl={iframeUrl} />} />
+          <Route path="/admin" element={<AdminPage />} />
+          <Route path="*" element={<TvDashboardPage iframeUrl={iframeUrl} />} />
+        </Routes>
+      </div>
+    );
+  }
 
   if (!isMobile) {
     // Desktop: single dashboard page, no bottom nav
