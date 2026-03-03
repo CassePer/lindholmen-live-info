@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { useLunchMenus } from "@/hooks/use-lunch";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/SearchInput";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ExternalLink, Search, AlertCircle, MapPin, RefreshCw } from "lucide-react";
+import { ExternalLink, Search as SearchIcon, AlertCircle, MapPin, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getLunchMenus } from "@/services/lunch";
 import { useQueryClient } from "@tanstack/react-query";
@@ -139,6 +139,7 @@ function RestaurantCard({ menu }: { menu: LunchMenu }) {
 
 export default function LunchPage({ embedded }: { embedded?: boolean }) {
   const [search, setSearch] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
   const { data, isLoading, error } = useLunchMenus();
   const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -183,31 +184,27 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
           Dagens lunch
         </motion.h1>
         <motion.div
+          className="flex items-center gap-1"
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2 }}
         >
+          <Button variant="ghost" size="icon" onClick={() => { setShowSearch((v) => !v); if (showSearch) setSearch(""); }} aria-label="Sök lunchmenyer">
+            <SearchIcon className="h-4 w-4" />
+          </Button>
           <Button variant="ghost" size="icon" onClick={handleRefresh} disabled={isRefreshing} aria-label="Uppdatera lunchmenyer">
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
           </Button>
         </motion.div>
       </div>
 
-      <motion.div
-        className="relative"
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1, duration: 0.3 }}
-      >
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Sök restaurang eller rätt..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-10"
-          aria-label="Sök bland restauranger"
-        />
-      </motion.div>
+      <AnimatePresence>
+        {showSearch && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}>
+            <SearchInput placeholder="Sök restaurang eller rätt..." value={search} onChange={setSearch} />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {isLoading ? (
         <MenuSkeleton />

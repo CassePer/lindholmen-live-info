@@ -2,16 +2,17 @@ import { useState } from "react";
 import { useDepartures } from "@/hooks/use-departures";
 import { SearchInput } from "@/components/SearchInput";
 import { useAppSettings } from "@/hooks/use-app-settings";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RefreshCw, AlertCircle, Ship, Train, Bus, ChevronDown, ChevronUp, Flag } from "lucide-react";
+import { RefreshCw, AlertCircle, Ship, Train, Bus, ChevronDown, ChevronUp, Flag, Search as SearchIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Departure, TransportType } from "@/api/types";
 import { useQueryClient } from "@tanstack/react-query";
 
-const TRANSPORT_ORDER: TransportType[] = ["Färja", "Spårvagn", "Buss"];
+const TRANSPORT_ORDER: TransportType[] = ["Buss", "Spårvagn", "Färja"];
 
 const TRANSPORT_ICON: Record<TransportType, React.ReactNode> = {
   Färja: <Ship className="h-5 w-5" />,
@@ -223,6 +224,7 @@ export default function DeparturesPage({ embedded }: { embedded?: boolean }) {
   const intervalSec = settings?.departure_refresh_interval ?? "60";
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ["departures"] });
@@ -244,29 +246,30 @@ export default function DeparturesPage({ embedded }: { embedded?: boolean }) {
             transition={{ duration: 0.4 }}
           >
             Avgångar
+            <span className="text-sm font-normal text-muted-foreground ml-2">{stopName}{updatedAtStr ? ` · ${updatedAtStr}` : ""}</span>
           </motion.h1>
           <motion.div
+            className="flex items-center gap-1"
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.2 }}
           >
+            <Button variant="ghost" size="icon" onClick={() => { setShowSearch((v) => !v); if (showSearch) setSearch(""); }} aria-label="Sök avgångar">
+              <SearchIcon className="h-4 w-4" />
+            </Button>
             <Button variant="ghost" size="icon" onClick={handleRefresh} aria-label="Uppdatera avgångar">
               <RefreshCw className="h-4 w-4" />
             </Button>
           </motion.div>
         </div>
 
-        <p className="text-sm text-muted-foreground font-medium">{stopName}</p>
-
-        <SearchInput
-          placeholder="Sök linje, destination..."
-          value={search}
-          onChange={setSearch}
-        />
-
-        {updatedAtStr && (
-          <p className="text-xs text-muted-foreground">Senast uppdaterad: {updatedAtStr}</p>
-        )}
+        <AnimatePresence>
+          {showSearch && (
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}>
+              <SearchInput placeholder="Sök linje, destination..." value={search} onChange={setSearch} />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {isLoading && <DepartureSkeleton />}
 
