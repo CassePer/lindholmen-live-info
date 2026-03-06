@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useSearchParams } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import BottomNav from "@/components/BottomNav";
 import LunchPage from "@/pages/LunchPage";
@@ -21,14 +21,23 @@ const queryClient = new QueryClient();
 function AppLayout() {
   const isMobile = useIsMobile();
   const { isTv, iframeUrl } = useTvMode();
+  const [searchParams] = useSearchParams();
+  const isAdminMode = searchParams.get("mode") === "admin";
+
+  // Admin mode: accessible via ?mode=admin on any device
+  if (isAdminMode) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <AdminPage />
+      </div>
+    );
+  }
 
   if (!isMobile && isTv) {
-    // TV mode: split-screen layout
     return (
       <div className="flex min-h-screen flex-col">
         <Routes>
           <Route path="/" element={<TvDashboardPage iframeUrl={iframeUrl} />} />
-          <Route path="/admin" element={<AdminPage />} />
           <Route path="*" element={<TvDashboardPage iframeUrl={iframeUrl} />} />
         </Routes>
       </div>
@@ -36,12 +45,10 @@ function AppLayout() {
   }
 
   if (!isMobile) {
-    // Desktop: single dashboard page, no bottom nav
     return (
       <div className="flex min-h-screen flex-col">
         <Routes>
           <Route path="/" element={<DashboardPage />} />
-          <Route path="/admin" element={<AdminPage />} />
           <Route path="/install" element={<InstallPage />} />
           <Route path="*" element={<DashboardPage />} />
         </Routes>
@@ -49,7 +56,6 @@ function AppLayout() {
     );
   }
 
-  // Mobile: tabbed pages with bottom nav
   return (
     <div className="flex min-h-screen flex-col">
       <InstallBanner />
@@ -57,7 +63,6 @@ function AppLayout() {
           <Route path="/" element={<LunchPage />} />
           <Route path="/avgangar" element={<DeparturesPage />} />
           <Route path="/kameror" element={<CamerasPage />} />
-          <Route path="/admin" element={<AdminPage />} />
           <Route path="/install" element={<InstallPage />} />
           <Route path="*" element={<NotFound />} />
       </Routes>
