@@ -1,6 +1,4 @@
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
-import { Settings } from "lucide-react";
 import LunchPage from "@/pages/LunchPage";
 import DeparturesPage from "@/pages/DeparturesPage";
 import CamerasPage from "@/pages/CamerasPage";
@@ -18,9 +16,6 @@ export default function DashboardPage() {
         >
           <h1 className="text-3xl font-bold font-display">Lindholmen Live</h1>
           <div className="flex items-center gap-1">
-            <Link to="/admin" className="text-muted-foreground hover:text-primary transition-colors p-2">
-              <Settings className="h-5 w-5" />
-            </Link>
             <ThemeToggle />
           </div>
         </motion.div>

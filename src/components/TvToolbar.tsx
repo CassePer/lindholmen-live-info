@@ -1,7 +1,6 @@
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
-import { PanelRightOpen, PanelRightClose, Settings, Maximize, Minimize } from "lucide-react";
-import { Link } from "react-router-dom";
+import { PanelRightOpen, PanelRightClose, Maximize, Minimize } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState, useCallback, useEffect } from "react";
 
@@ -56,11 +55,6 @@ export function TvToolbar({ iframeVisible, onToggleIframe }: TvToolbarProps) {
         {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
       </Button>
       <ThemeToggle />
-      <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-        <Link to="/admin">
-          <Settings className="h-4 w-4" />
-        </Link>
-      </Button>
     </motion.div>
   );
 }
