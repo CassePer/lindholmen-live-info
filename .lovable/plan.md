@@ -1,17 +1,14 @@
 
+## Gör Uppdatera-knappen diskretare
 
-## Plan: Förenkla TV-dashboard layout
+Ändra knappen i `src/pages/DeparturesPage.tsx` från en outline-knapp med text ("Uppdatera") till en minimal ghost-ikonknapp (bara RefreshCw-ikonen, utan text).
 
-### TvDashboardPage.tsx
-- Replace `ResizablePanelGroup`/`ResizablePanel`/`ResizableHandle` with a simple flex layout
-- Left side: `w-1/3` with Lunch + Departures
-- Right side: `w-2/3` with iframe (always visible, no toggle)
-- Remove `useState` for `iframeVisible`, `AnimatePresence`, and motion wrapper
-- Remove `iframeVisible`/`onToggleIframe` props from TvToolbar
+### Ändringar
 
-### TvToolbar.tsx
-- Remove iframe toggle button and fullscreen button (and related state/effects)
-- Keep only `ThemeToggle`
-- Remove `iframeVisible`/`onToggleIframe` props
-- Simplify to a minimal floating toolbar with just the theme toggle
+**Fil:** `src/pages/DeparturesPage.tsx`
 
+- Ändra `variant="outline"` till `variant="ghost"`
+- Ändra `size="sm"` till `size="icon"`
+- Ta bort texten "Uppdatera" från knappen
+- Behåll `aria-label` för tillgänglighet
+- Ta bort `hover-scale`-klassen och `mr-1` från ikonen
