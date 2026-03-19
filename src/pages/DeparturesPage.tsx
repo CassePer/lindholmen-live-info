@@ -27,6 +27,21 @@ const TRANSPORT_COLORS: Record<TransportType, string> = {
   Buss: "bg-bus text-primary-foreground",
 };
 
+const TRAM_LINE_COLORS: Record<string, { bg: string; text: string }> = {
+  "1":  { bg: "#FFFFFF", text: "#000000" },
+  "2":  { bg: "#FFD700", text: "#000000" },
+  "3":  { bg: "#0066B3", text: "#FFFFFF" },
+  "4":  { bg: "#009640", text: "#FFFFFF" },
+  "5":  { bg: "#E3000B", text: "#FFFFFF" },
+  "6":  { bg: "#F39100", text: "#FFFFFF" },
+  "7":  { bg: "#8B4513", text: "#FFFFFF" },
+  "8":  { bg: "#E6007E", text: "#FFFFFF" },
+  "9":  { bg: "#00A5E3", text: "#FFFFFF" },
+  "10": { bg: "#C4D600", text: "#000000" },
+  "11": { bg: "#1D1D1B", text: "#FFFFFF" },
+  "13": { bg: "#6F2282", text: "#FFFFFF" },
+};
+
 const TRANSPORT_STOP: Record<string, string> = {
   Färja: "Lindholmspiren",
   Spårvagn: "Lindholmen",
