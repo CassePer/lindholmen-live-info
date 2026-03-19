@@ -27,6 +27,21 @@ const TRANSPORT_COLORS: Record<TransportType, string> = {
   Buss: "bg-bus text-primary-foreground",
 };
 
+const TRAM_LINE_COLORS: Record<string, { bg: string; text: string }> = {
+  "1":  { bg: "#FFFFFF", text: "#000000" },
+  "2":  { bg: "#FFD700", text: "#000000" },
+  "3":  { bg: "#0066B3", text: "#FFFFFF" },
+  "4":  { bg: "#009640", text: "#FFFFFF" },
+  "5":  { bg: "#E3000B", text: "#FFFFFF" },
+  "6":  { bg: "#F39100", text: "#FFFFFF" },
+  "7":  { bg: "#8B4513", text: "#FFFFFF" },
+  "8":  { bg: "#E6007E", text: "#FFFFFF" },
+  "9":  { bg: "#00A5E3", text: "#FFFFFF" },
+  "10": { bg: "#C4D600", text: "#000000" },
+  "11": { bg: "#1D1D1B", text: "#FFFFFF" },
+  "13": { bg: "#6F2282", text: "#FFFFFF" },
+};
+
 const TRANSPORT_STOP: Record<string, string> = {
   Färja: "Lindholmspiren",
   Spårvagn: "Lindholmen",
@@ -54,7 +69,8 @@ function DepartureSkeleton() {
 function DepartureRow({ dep, index, search }: { dep: Departure; index: number; search: string }) {
   const time = dep.estimatedTime ?? dep.scheduledTime;
   const hasDelay = dep.delayMinutes > 0;
-  const colorClass = TRANSPORT_COLORS[dep.transportType] ?? "bg-muted text-muted-foreground";
+  const tramColor = dep.transportType === "Spårvagn" ? TRAM_LINE_COLORS[dep.line] : null;
+  const colorClass = tramColor ? "" : (TRANSPORT_COLORS[dep.transportType] ?? "bg-muted text-muted-foreground");
 
   return (
     <motion.div
@@ -63,7 +79,10 @@ function DepartureRow({ dep, index, search }: { dep: Departure; index: number; s
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.04, duration: 0.25 }}
     >
-      <span className={`font-bold text-sm min-w-[2.5rem] text-center rounded-md px-1.5 py-1 ${colorClass}`}>
+      <span
+        className={`font-bold text-sm min-w-[2.5rem] text-center rounded-md px-1.5 py-1 ${colorClass}`}
+        style={tramColor ? { backgroundColor: tramColor.bg, color: tramColor.text, border: tramColor.bg === "#FFFFFF" ? "1px solid #ccc" : undefined } : undefined}
+      >
         {dep.line}
       </span>
       {dep.line === "286" && (
