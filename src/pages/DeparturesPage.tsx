@@ -108,7 +108,7 @@ function DepartureRow({ dep, index, search }: { dep: Departure; index: number; s
     >
       <span
         className={`font-bold text-sm min-w-[2.5rem] text-center rounded-md px-1.5 py-1 ${colorClass}`}
-        style={tramColor ? { backgroundColor: tramColor.bg, color: tramColor.text, border: tramColor.bg === "#FFFFFF" ? "1px solid #ccc" : undefined } : undefined}
+        style={lineColor ? { backgroundColor: lineColor.bg, color: lineColor.text, border: lineColor.bg === "#FFFFFF" ? "1px solid #ccc" : undefined } : undefined}
       >
         {dep.line}
       </span>
