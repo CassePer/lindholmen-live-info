@@ -27,7 +27,9 @@ const TRANSPORT_COLORS: Record<TransportType, string> = {
   Buss: "bg-bus text-primary-foreground",
 };
 
-const TRAM_LINE_COLORS: Record<string, { bg: string; text: string }> = {
+// Official Västtrafik line colors: trams, trunk buses, express buses, ferries
+const LINE_COLORS: Record<string, { bg: string; text: string }> = {
+  // Spårvagnar
   "1":  { bg: "#FFFFFF", text: "#000000" },
   "2":  { bg: "#FFD700", text: "#000000" },
   "3":  { bg: "#0066B3", text: "#FFFFFF" },
@@ -40,6 +42,31 @@ const TRAM_LINE_COLORS: Record<string, { bg: string; text: string }> = {
   "10": { bg: "#C4D600", text: "#000000" },
   "11": { bg: "#1D1D1B", text: "#FFFFFF" },
   "13": { bg: "#6F2282", text: "#FFFFFF" },
+  // Stombussar
+  "17": { bg: "#0066B3", text: "#FFFFFF" },
+  "18": { bg: "#1D1D5C", text: "#FFFFFF" },
+  "19": { bg: "#009640", text: "#FFFFFF" },
+  "21": { bg: "#B5121B", text: "#FFFFFF" },
+  "25": { bg: "#006461", text: "#FFFFFF" },
+  // Expressbussar
+  "X1":  { bg: "#F5A623", text: "#000000" },
+  "X2":  { bg: "#E87CAC", text: "#000000" },
+  "X3":  { bg: "#0066B3", text: "#FFFFFF" },
+  "X4":  { bg: "#7BC144", text: "#000000" },
+  "X5":  { bg: "#1D1D1B", text: "#FFFFFF" },
+  "X6":  { bg: "#E3000B", text: "#FFFFFF" },
+  "X40": { bg: "#C4D600", text: "#000000" },
+  "X76": { bg: "#E6007E", text: "#FFFFFF" },
+  "X77": { bg: "#F39100", text: "#FFFFFF" },
+  "X90": { bg: "#E87CAC", text: "#000000" },
+  // Färjor
+  "286": { bg: "#009640", text: "#FFFFFF" },
+  "287": { bg: "#009640", text: "#FFFFFF" },
+  "285": { bg: "#00A5E3", text: "#FFFFFF" },
+  "281": { bg: "#009640", text: "#FFFFFF" },
+  "282": { bg: "#009640", text: "#FFFFFF" },
+  "283": { bg: "#009640", text: "#FFFFFF" },
+  "284": { bg: "#009640", text: "#FFFFFF" },
 };
 
 const TRANSPORT_STOP: Record<string, string> = {
