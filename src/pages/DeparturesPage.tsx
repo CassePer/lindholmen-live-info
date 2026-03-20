@@ -96,8 +96,8 @@ function DepartureSkeleton() {
 function DepartureRow({ dep, index, search }: { dep: Departure; index: number; search: string }) {
   const time = dep.estimatedTime ?? dep.scheduledTime;
   const hasDelay = dep.delayMinutes > 0;
-  const tramColor = dep.transportType === "Spårvagn" ? TRAM_LINE_COLORS[dep.line] : null;
-  const colorClass = tramColor ? "" : (TRANSPORT_COLORS[dep.transportType] ?? "bg-muted text-muted-foreground");
+  const lineColor = LINE_COLORS[dep.line] ?? null;
+  const colorClass = lineColor ? "" : (TRANSPORT_COLORS[dep.transportType] ?? "bg-muted text-muted-foreground");
 
   return (
     <motion.div
