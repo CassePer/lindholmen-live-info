@@ -3,6 +3,7 @@ import { useDepartures } from "@/hooks/use-departures";
 import { SearchInput } from "@/components/SearchInput";
 import { HighlightText } from "@/components/HighlightText";
 import { useAppSettings } from "@/hooks/use-app-settings";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
