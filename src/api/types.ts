@@ -64,6 +64,7 @@ export interface Departure {
   transportType: TransportType;
   scheduledIso?: string;
   realtimeIso?: string;
+  alerts?: DepartureAlert[];
 }
 
 export interface DepartureAlert {
