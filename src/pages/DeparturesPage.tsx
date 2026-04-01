@@ -396,7 +396,7 @@ export default function DeparturesPage({ embedded }: { embedded?: boolean }) {
               })
             : visibleDepartures;
 
-          return <GroupedDepartures search={activeSearch} departures={filtered} />;
+          return <GroupedDepartures search={activeSearch} departures={filtered} globalAlerts={data.alerts} />;
         })()}
 
 
