@@ -98,21 +98,34 @@ function mapDepartures(data: TrafiklabResponse): {
   transportType: string;
   scheduledIso: string;
   realtimeIso?: string;
+  alerts?: { header: string; description: string; validFrom?: string; validTo?: string }[];
 }[] {
   return (data.departures || [])
     .filter((d) => !d.canceled)
-    .map((d, i) => ({
-      id: `${d.trip?.trip_id || i}-${d.scheduled}`,
-      line: d.route.designation,
-      destination: d.route.direction || d.route.destination?.name || '',
-      scheduledTime: formatTime(d.scheduled),
-      estimatedTime: d.realtime ? formatTime(d.realtime) : undefined,
-      delayMinutes: d.delay || 0,
-      isRealtime: d.is_realtime ?? false,
-      transportType: mapTransportMode(d.route.transport_mode, d.route.transport_mode_code),
-      scheduledIso: d.scheduled,
-      realtimeIso: d.realtime,
-    }));
+    .map((d, i) => {
+      const alerts = (d.alerts || [])
+        .filter((a) => a.header || a.description)
+        .map((a) => ({
+          header: a.header || '',
+          description: a.description || '',
+          validFrom: a.valid_from,
+          validTo: a.valid_to,
+        }));
+
+      return {
+        id: `${d.trip?.trip_id || i}-${d.scheduled}`,
+        line: d.route.designation,
+        destination: d.route.direction || d.route.destination?.name || '',
+        scheduledTime: formatTime(d.scheduled),
+        estimatedTime: d.realtime ? formatTime(d.realtime) : undefined,
+        delayMinutes: d.delay || 0,
+        isRealtime: d.is_realtime ?? false,
+        transportType: mapTransportMode(d.route.transport_mode, d.route.transport_mode_code),
+        scheduledIso: d.scheduled,
+        realtimeIso: d.realtime,
+        ...(alerts.length > 0 ? { alerts } : {}),
+      };
+    });
 }
 
 async function getStopIds(): Promise<{ bus: string; tram: string; ferry: string }> {
