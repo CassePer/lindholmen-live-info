@@ -8,9 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RefreshCw, AlertCircle, Ship, Train, Bus, ChevronDown, ChevronUp, Flag, Search as SearchIcon } from "lucide-react";
+import { RefreshCw, AlertCircle, AlertTriangle, Ship, Train, Bus, ChevronDown, ChevronUp, Flag, Search as SearchIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import type { Departure, TransportType } from "@/api/types";
+import type { Departure, TransportType, DepartureAlert } from "@/api/types";
 import { useQueryClient } from "@tanstack/react-query";
 
 const TRANSPORT_ORDER: TransportType[] = ["Buss", "Spårvagn", "Färja"];

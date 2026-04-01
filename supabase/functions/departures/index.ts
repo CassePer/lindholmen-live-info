@@ -222,8 +222,24 @@ Deno.serve(async (req) => {
 
     const stopName = uniqueStops.length > 1 ? 'Lindholmen & Lindholmspiren' : 'Lindholmen';
 
+    // Collect unique alerts across all departures
+    const alertSet = new Map<string, { header: string; description: string; validFrom?: string; validTo?: string }>();
+    for (const d of allDepartures) {
+      if (d.alerts) {
+        for (const a of d.alerts) {
+          const key = `${a.header}|${a.description}`;
+          if (!alertSet.has(key)) alertSet.set(key, a);
+        }
+      }
+    }
+    const globalAlerts = [...alertSet.values()];
+    if (globalAlerts.length > 0) {
+      console.log(`Found ${globalAlerts.length} unique alerts`);
+    }
+
     const result = {
       departures: allDepartures,
+      alerts: globalAlerts.length > 0 ? globalAlerts : undefined,
       updatedAt: timestamp,
       areaId: stopIds.bus,
       stopName,
