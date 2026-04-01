@@ -51,7 +51,7 @@ export interface WeeklyLunchMenu {
 
 // ── Departures ──
 
-export type TransportType = "Färja" | "Spårvagn" | "Buss";
+export type TransportType = "Färja" | "Spårvagn" | "Buss" | "Tåg";
 
 export interface Departure {
   id: string;

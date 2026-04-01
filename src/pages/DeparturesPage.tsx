@@ -347,19 +347,23 @@ export default function DeparturesPage({ embedded }: { embedded?: boolean }) {
           </div>
         )}
 
-        {data && data.departures.length > 0 && (
-          <GroupedDepartures
-            search={activeSearch}
-            departures={
-              activeSearch.trim()
-                ? data.departures.filter((d) => {
-                    const q = activeSearch.toLowerCase();
-                    return d.line.toLowerCase().includes(q) || d.destination.toLowerCase().includes(q) || d.transportType.toLowerCase().includes(q);
-                  })
-                : data.departures
-            }
-          />
-        )}
+        {data && data.departures.length > 0 && (() => {
+          // Filter by visibility settings
+          const showBus = settings?.departure_show_bus !== "false";
+          const showTram = settings?.departure_show_tram !== "false";
+          const showFerry = settings?.departure_show_ferry !== "false";
+          const visibilityMap: Record<string, boolean> = { Buss: showBus, Spårvagn: showTram, Färja: showFerry };
+          const visibleDepartures = data.departures.filter((d) => visibilityMap[d.transportType] !== false);
+
+          const filtered = activeSearch.trim()
+            ? visibleDepartures.filter((d) => {
+                const q = activeSearch.toLowerCase();
+                return d.line.toLowerCase().includes(q) || d.destination.toLowerCase().includes(q) || d.transportType.toLowerCase().includes(q);
+              })
+            : visibleDepartures;
+
+          return <GroupedDepartures search={activeSearch} departures={filtered} />;
+        })()}
 
 
         <p className="text-xs text-muted-foreground text-center pt-2 pb-8">

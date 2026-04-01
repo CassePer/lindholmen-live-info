@@ -328,6 +328,55 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
           </CardContent>
         </Card>
 
+        {/* Departure stops & visibility */}
+        <Card className="glass-card">
+          <CardHeader>
+            <CardTitle className="text-base font-display flex items-center gap-2"><MapPin className="h-4 w-4" /> Avgångar – hållplatser & synlighet</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Buss – hållplats-ID</label>
+              <div className="flex gap-2">
+                <Input value={currentStopBus} onChange={(e) => setStopBus(e.target.value)} className="w-48" placeholder="740059410" />
+                <Button size="sm" onClick={() => saveSettingMutation.mutate({ key: "departure_stop_bus", value: currentStopBus })} disabled={saveSettingMutation.isPending}>Spara</Button>
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Spårvagn – hållplats-ID</label>
+              <div className="flex gap-2">
+                <Input value={currentStopTram} onChange={(e) => setStopTram(e.target.value)} className="w-48" placeholder="740059410" />
+                <Button size="sm" onClick={() => saveSettingMutation.mutate({ key: "departure_stop_tram", value: currentStopTram })} disabled={saveSettingMutation.isPending}>Spara</Button>
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Färja – hållplats-ID</label>
+              <div className="flex gap-2">
+                <Input value={currentStopFerry} onChange={(e) => setStopFerry(e.target.value)} className="w-48" placeholder="740059412" />
+                <Button size="sm" onClick={() => saveSettingMutation.mutate({ key: "departure_stop_ferry", value: currentStopFerry })} disabled={saveSettingMutation.isPending}>Spara</Button>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">Hållplats-IDs från Trafiklab (t.ex. 740059410 = Lindholmen).</p>
+
+            <div className="border-t pt-3 mt-2">
+              <p className="text-sm font-medium mb-2 flex items-center gap-2"><Eye className="h-4 w-4" /> Visa transportslag</p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox id="show-bus" checked={showBus} onCheckedChange={(v) => saveSettingMutation.mutate({ key: "departure_show_bus", value: String(v) })} />
+                  <Label htmlFor="show-bus">Buss</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox id="show-tram" checked={showTram} onCheckedChange={(v) => saveSettingMutation.mutate({ key: "departure_show_tram", value: String(v) })} />
+                  <Label htmlFor="show-tram">Spårvagn</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox id="show-ferry" checked={showFerry} onCheckedChange={(v) => saveSettingMutation.mutate({ key: "departure_show_ferry", value: String(v) })} />
+                  <Label htmlFor="show-ferry">Färja</Label>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Restaurants header */}
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold font-display">Restauranger ({restaurants?.length ?? 0})</h2>
