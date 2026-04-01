@@ -204,9 +204,18 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
   const [lunchHour, setLunchHour] = useState<string | null>(null);
   const [tvIpRange, setTvIpRange] = useState<string | null>(null);
   const [tvIframeUrl, setTvIframeUrl] = useState<string | null>(null);
+  const [stopBus, setStopBus] = useState<string | null>(null);
+  const [stopTram, setStopTram] = useState<string | null>(null);
+  const [stopFerry, setStopFerry] = useState<string | null>(null);
 
   const currentInterval = refreshInterval ?? settings?.departure_refresh_interval ?? "60";
   const currentLunchHour = lunchHour ?? settings?.lunch_auto_refresh_hour ?? "10";
+  const currentStopBus = stopBus ?? settings?.departure_stop_bus ?? "740059410";
+  const currentStopTram = stopTram ?? settings?.departure_stop_tram ?? "740059410";
+  const currentStopFerry = stopFerry ?? settings?.departure_stop_ferry ?? "740059412";
+  const showBus = settings?.departure_show_bus !== "false";
+  const showTram = settings?.departure_show_tram !== "false";
+  const showFerry = settings?.departure_show_ferry !== "false";
 
   const addMutation = useMutation({
     mutationFn: async () => {
