@@ -3,14 +3,15 @@ import { useDepartures } from "@/hooks/use-departures";
 import { SearchInput } from "@/components/SearchInput";
 import { HighlightText } from "@/components/HighlightText";
 import { useAppSettings } from "@/hooks/use-app-settings";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RefreshCw, AlertCircle, Ship, Train, Bus, ChevronDown, ChevronUp, Flag, Search as SearchIcon } from "lucide-react";
+import { RefreshCw, AlertCircle, AlertTriangle, Ship, Train, Bus, ChevronDown, ChevronUp, Flag, Search as SearchIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import type { Departure, TransportType } from "@/api/types";
+import type { Departure, TransportType, DepartureAlert } from "@/api/types";
 import { useQueryClient } from "@tanstack/react-query";
 
 const TRANSPORT_ORDER: TransportType[] = ["Buss", "Spårvagn", "Färja"];
@@ -158,7 +159,7 @@ function splitDepartures(items: Departure[]): { past: Departure[]; upcoming: Dep
   return { past, upcoming };
 }
 
-function GroupedDepartures({ departures, search }: { departures: Departure[]; search: string }) {
+function GroupedDepartures({ departures, search, globalAlerts }: { departures: Departure[]; search: string; globalAlerts?: DepartureAlert[] }) {
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   const grouped = TRANSPORT_ORDER.map((type) => ({
@@ -214,6 +215,37 @@ function GroupedDepartures({ departures, search }: { departures: Departure[]; se
                   </span>
                 </CardTitle>
               </CardHeader>
+              {/* Alerts for this transport group */}
+              {(() => {
+                const groupAlerts = new Map<string, DepartureAlert>();
+                // Collect from individual departures
+                for (const dep of group.items) {
+                  if (dep.alerts) {
+                    for (const a of dep.alerts) {
+                      const key = `${a.header}|${a.description}`;
+                      if (!groupAlerts.has(key)) groupAlerts.set(key, a);
+                    }
+                  }
+                }
+                // Also check global alerts (shown on first group that has items, or all)
+                const alerts = [...groupAlerts.values()];
+                if (alerts.length === 0) return null;
+                return (
+                  <div className="px-6 pb-0">
+                    {alerts.map((alert, ai) => (
+                      <Alert key={ai} className="mb-2 border-warning/50 bg-warning/10">
+                        <AlertTriangle className="h-4 w-4 text-warning" />
+                        <AlertDescription className="ml-2">
+                          <span className="font-semibold text-sm">{alert.header}</span>
+                          {alert.description && (
+                            <p className="text-xs text-muted-foreground mt-0.5">{alert.description}</p>
+                          )}
+                        </AlertDescription>
+                      </Alert>
+                    ))}
+                  </div>
+                );
+              })()}
               <CardContent>
                 {group.items.length === 0 && (
                   <p className="text-sm text-muted-foreground py-4 text-center">
@@ -364,7 +396,7 @@ export default function DeparturesPage({ embedded }: { embedded?: boolean }) {
               })
             : visibleDepartures;
 
-          return <GroupedDepartures search={activeSearch} departures={filtered} />;
+          return <GroupedDepartures search={activeSearch} departures={filtered} globalAlerts={data.alerts} />;
         })()}
 
 

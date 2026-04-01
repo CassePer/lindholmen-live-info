@@ -12,6 +12,13 @@ const DEFAULT_STOP_BUS = '740059410';
 const DEFAULT_STOP_TRAM = '740059410';
 const DEFAULT_STOP_FERRY = '740059412';
 
+interface TrafiklabAlert {
+  header?: string;
+  description?: string;
+  valid_from?: string;
+  valid_to?: string;
+}
+
 interface TrafiklabDeparture {
   scheduled: string;
   realtime?: string;
@@ -37,7 +44,7 @@ interface TrafiklabDeparture {
     id: string;
     name: string;
   };
-  alerts: unknown[];
+  alerts: TrafiklabAlert[];
 }
 
 interface TrafiklabResponse {
@@ -91,21 +98,34 @@ function mapDepartures(data: TrafiklabResponse): {
   transportType: string;
   scheduledIso: string;
   realtimeIso?: string;
+  alerts?: { header: string; description: string; validFrom?: string; validTo?: string }[];
 }[] {
   return (data.departures || [])
     .filter((d) => !d.canceled)
-    .map((d, i) => ({
-      id: `${d.trip?.trip_id || i}-${d.scheduled}`,
-      line: d.route.designation,
-      destination: d.route.direction || d.route.destination?.name || '',
-      scheduledTime: formatTime(d.scheduled),
-      estimatedTime: d.realtime ? formatTime(d.realtime) : undefined,
-      delayMinutes: d.delay || 0,
-      isRealtime: d.is_realtime ?? false,
-      transportType: mapTransportMode(d.route.transport_mode, d.route.transport_mode_code),
-      scheduledIso: d.scheduled,
-      realtimeIso: d.realtime,
-    }));
+    .map((d, i) => {
+      const alerts = (d.alerts || [])
+        .filter((a) => a.header || a.description)
+        .map((a) => ({
+          header: a.header || '',
+          description: a.description || '',
+          validFrom: a.valid_from,
+          validTo: a.valid_to,
+        }));
+
+      return {
+        id: `${d.trip?.trip_id || i}-${d.scheduled}`,
+        line: d.route.designation,
+        destination: d.route.direction || d.route.destination?.name || '',
+        scheduledTime: formatTime(d.scheduled),
+        estimatedTime: d.realtime ? formatTime(d.realtime) : undefined,
+        delayMinutes: d.delay || 0,
+        isRealtime: d.is_realtime ?? false,
+        transportType: mapTransportMode(d.route.transport_mode, d.route.transport_mode_code),
+        scheduledIso: d.scheduled,
+        realtimeIso: d.realtime,
+        ...(alerts.length > 0 ? { alerts } : {}),
+      };
+    });
 }
 
 async function getStopIds(): Promise<{ bus: string; tram: string; ferry: string }> {
@@ -202,8 +222,24 @@ Deno.serve(async (req) => {
 
     const stopName = uniqueStops.length > 1 ? 'Lindholmen & Lindholmspiren' : 'Lindholmen';
 
+    // Collect unique alerts across all departures
+    const alertSet = new Map<string, { header: string; description: string; validFrom?: string; validTo?: string }>();
+    for (const d of allDepartures) {
+      if (d.alerts) {
+        for (const a of d.alerts) {
+          const key = `${a.header}|${a.description}`;
+          if (!alertSet.has(key)) alertSet.set(key, a);
+        }
+      }
+    }
+    const globalAlerts = [...alertSet.values()];
+    if (globalAlerts.length > 0) {
+      console.log(`Found ${globalAlerts.length} unique alerts`);
+    }
+
     const result = {
       departures: allDepartures,
+      alerts: globalAlerts.length > 0 ? globalAlerts : undefined,
       updatedAt: timestamp,
       areaId: stopIds.bus,
       stopName,
