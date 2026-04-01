@@ -1,3 +1,5 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
@@ -5,9 +7,10 @@ const corsHeaders = {
 
 const TRAFIKLAB_BASE = 'https://realtime-api.trafiklab.se/v1';
 
-// Two stop IDs to cover both bus/tram and ferry departures at Lindholmen
-const LINDHOLMEN_AREA_ID = '740059410'; // Lindholmen (bus, tram)
-const LINDHOLMSPIREN_AREA_ID = '740059412'; // Lindholmspiren (ferry)
+// Default stop IDs (can be overridden via app_settings)
+const DEFAULT_STOP_BUS = '740059410';
+const DEFAULT_STOP_TRAM = '740059410';
+const DEFAULT_STOP_FERRY = '740059412';
 
 interface TrafiklabDeparture {
   scheduled: string;
@@ -105,6 +108,42 @@ function mapDepartures(data: TrafiklabResponse): {
     }));
 }
 
+async function getStopIds(): Promise<{ bus: string; tram: string; ferry: string }> {
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!supabaseUrl || !serviceKey) {
+      console.log('No Supabase credentials, using default stop IDs');
+      return { bus: DEFAULT_STOP_BUS, tram: DEFAULT_STOP_TRAM, ferry: DEFAULT_STOP_FERRY };
+    }
+
+    const supabase = createClient(supabaseUrl, serviceKey);
+    const { data, error } = await supabase
+      .from('app_settings')
+      .select('key, value')
+      .in('key', ['departure_stop_bus', 'departure_stop_tram', 'departure_stop_ferry']);
+
+    if (error) {
+      console.error('Error fetching stop IDs from settings:', error.message);
+      return { bus: DEFAULT_STOP_BUS, tram: DEFAULT_STOP_TRAM, ferry: DEFAULT_STOP_FERRY };
+    }
+
+    const settings: Record<string, string> = {};
+    for (const row of data || []) {
+      settings[row.key] = row.value;
+    }
+
+    return {
+      bus: settings.departure_stop_bus || DEFAULT_STOP_BUS,
+      tram: settings.departure_stop_tram || DEFAULT_STOP_TRAM,
+      ferry: settings.departure_stop_ferry || DEFAULT_STOP_FERRY,
+    };
+  } catch (err) {
+    console.error('Error reading stop settings:', err);
+    return { bus: DEFAULT_STOP_BUS, tram: DEFAULT_STOP_TRAM, ferry: DEFAULT_STOP_FERRY };
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -122,28 +161,35 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const time = url.searchParams.get('time');
 
-    // Fetch departures from both Lindholmen (bus/tram) and Lindholmspiren (ferry) in parallel
-    const results = await Promise.all([
-      fetchDepartures(LINDHOLMEN_AREA_ID, apiKey, time),
-      fetchDepartures(LINDHOLMSPIREN_AREA_ID, apiKey, time),
-    ]);
-
+    // Get configured stop IDs
+    const stopIds = await getStopIds();
     
+    // Collect unique stop IDs to fetch
+    const uniqueStops = [...new Set([stopIds.bus, stopIds.tram, stopIds.ferry])];
+    console.log('Fetching from stops:', uniqueStops.join(', '));
+
+    // Fetch departures from all unique stops in parallel
+    const results = await Promise.all(
+      uniqueStops.map((id) => fetchDepartures(id, apiKey, time))
+    );
 
     // Merge departures from all stops
     let allDepartures: ReturnType<typeof mapDepartures> = [];
     let timestamp = new Date().toISOString();
-    let stopName = 'Lindholmen';
 
     for (const data of results) {
       if (data) {
         allDepartures = allDepartures.concat(mapDepartures(data));
         timestamp = data.timestamp || timestamp;
-        if (data.stops?.[0]?.name) {
-          stopName = 'Lindholmen & Lindholmspiren';
-        }
       }
     }
+
+    // Log transport type counts for debugging
+    const typeCounts: Record<string, number> = {};
+    for (const d of allDepartures) {
+      typeCounts[d.transportType] = (typeCounts[d.transportType] || 0) + 1;
+    }
+    console.log('Departure counts by type:', JSON.stringify(typeCounts));
 
     // Sort by scheduled time and deduplicate
     allDepartures.sort((a, b) => a.scheduledIso.localeCompare(b.scheduledIso));
@@ -154,10 +200,12 @@ Deno.serve(async (req) => {
       return true;
     });
 
+    const stopName = uniqueStops.length > 1 ? 'Lindholmen & Lindholmspiren' : 'Lindholmen';
+
     const result = {
       departures: allDepartures,
       updatedAt: timestamp,
-      areaId: LINDHOLMEN_AREA_ID,
+      areaId: stopIds.bus,
       stopName,
     };
 

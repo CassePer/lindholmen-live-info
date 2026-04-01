@@ -4,7 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Trash2, Plus, ArrowLeft, ExternalLink, RefreshCw, Pencil, Check, X, Settings, Lock, LogOut } from "lucide-react";
+import { Trash2, Plus, ArrowLeft, ExternalLink, RefreshCw, Pencil, Check, X, Settings, Lock, LogOut, MapPin, Eye } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -202,9 +204,18 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
   const [lunchHour, setLunchHour] = useState<string | null>(null);
   const [tvIpRange, setTvIpRange] = useState<string | null>(null);
   const [tvIframeUrl, setTvIframeUrl] = useState<string | null>(null);
+  const [stopBus, setStopBus] = useState<string | null>(null);
+  const [stopTram, setStopTram] = useState<string | null>(null);
+  const [stopFerry, setStopFerry] = useState<string | null>(null);
 
   const currentInterval = refreshInterval ?? settings?.departure_refresh_interval ?? "60";
   const currentLunchHour = lunchHour ?? settings?.lunch_auto_refresh_hour ?? "10";
+  const currentStopBus = stopBus ?? settings?.departure_stop_bus ?? "740059410";
+  const currentStopTram = stopTram ?? settings?.departure_stop_tram ?? "740059410";
+  const currentStopFerry = stopFerry ?? settings?.departure_stop_ferry ?? "740059412";
+  const showBus = settings?.departure_show_bus !== "false";
+  const showTram = settings?.departure_show_tram !== "false";
+  const showFerry = settings?.departure_show_ferry !== "false";
 
   const addMutation = useMutation({
     mutationFn: async () => {
@@ -312,6 +323,55 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
                 <Button size="sm" onClick={() => saveSettingMutation.mutate({ key: "tv_iframe_url", value: tvIframeUrl ?? "" })} disabled={saveSettingMutation.isPending}>
                   {saveSettingMutation.isPending ? "Sparar..." : "Spara"}
                 </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Departure stops & visibility */}
+        <Card className="glass-card">
+          <CardHeader>
+            <CardTitle className="text-base font-display flex items-center gap-2"><MapPin className="h-4 w-4" /> Avgångar – hållplatser & synlighet</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Buss – hållplats-ID</label>
+              <div className="flex gap-2">
+                <Input value={currentStopBus} onChange={(e) => setStopBus(e.target.value)} className="w-48" placeholder="740059410" />
+                <Button size="sm" onClick={() => saveSettingMutation.mutate({ key: "departure_stop_bus", value: currentStopBus })} disabled={saveSettingMutation.isPending}>Spara</Button>
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Spårvagn – hållplats-ID</label>
+              <div className="flex gap-2">
+                <Input value={currentStopTram} onChange={(e) => setStopTram(e.target.value)} className="w-48" placeholder="740059410" />
+                <Button size="sm" onClick={() => saveSettingMutation.mutate({ key: "departure_stop_tram", value: currentStopTram })} disabled={saveSettingMutation.isPending}>Spara</Button>
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Färja – hållplats-ID</label>
+              <div className="flex gap-2">
+                <Input value={currentStopFerry} onChange={(e) => setStopFerry(e.target.value)} className="w-48" placeholder="740059412" />
+                <Button size="sm" onClick={() => saveSettingMutation.mutate({ key: "departure_stop_ferry", value: currentStopFerry })} disabled={saveSettingMutation.isPending}>Spara</Button>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">Hållplats-IDs från Trafiklab (t.ex. 740059410 = Lindholmen).</p>
+
+            <div className="border-t pt-3 mt-2">
+              <p className="text-sm font-medium mb-2 flex items-center gap-2"><Eye className="h-4 w-4" /> Visa transportslag</p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox id="show-bus" checked={showBus} onCheckedChange={(v) => saveSettingMutation.mutate({ key: "departure_show_bus", value: String(v) })} />
+                  <Label htmlFor="show-bus">Buss</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox id="show-tram" checked={showTram} onCheckedChange={(v) => saveSettingMutation.mutate({ key: "departure_show_tram", value: String(v) })} />
+                  <Label htmlFor="show-tram">Spårvagn</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox id="show-ferry" checked={showFerry} onCheckedChange={(v) => saveSettingMutation.mutate({ key: "departure_show_ferry", value: String(v) })} />
+                  <Label htmlFor="show-ferry">Färja</Label>
+                </div>
               </div>
             </div>
           </CardContent>

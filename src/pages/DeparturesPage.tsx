@@ -19,54 +19,56 @@ const TRANSPORT_ICON: Record<TransportType, React.ReactNode> = {
   Färja: <Ship className="h-5 w-5" />,
   Spårvagn: <Train className="h-5 w-5" />,
   Buss: <Bus className="h-5 w-5" />,
+  Tåg: <Train className="h-5 w-5" />,
 };
 
 const TRANSPORT_COLORS: Record<TransportType, string> = {
   Färja: "bg-ferry text-primary-foreground",
   Spårvagn: "bg-tram text-primary-foreground",
   Buss: "bg-bus text-primary-foreground",
+  Tåg: "bg-tram text-primary-foreground",
 };
 
 // Official Västtrafik line colors: trams, trunk buses, express buses, ferries
 const LINE_COLORS: Record<string, { bg: string; text: string }> = {
   // Spårvagnar
-  "1":  { bg: "#FFFFFF", text: "#000000" },
-  "2":  { bg: "#FFD700", text: "#000000" },
-  "3":  { bg: "#0066B3", text: "#FFFFFF" },
+  "1":  { bg: "#333333", text: "#FFFFFF" },
+  "2":  { bg: "#FFFFFF", text: "#000000" },
+  "3":  { bg: "#004B93", text: "#FFFFFF" },
   "4":  { bg: "#009640", text: "#FFFFFF" },
   "5":  { bg: "#E3000B", text: "#FFFFFF" },
-  "6":  { bg: "#F39100", text: "#FFFFFF" },
+  "6":  { bg: "#FFD700", text: "#000000" },
   "7":  { bg: "#8B4513", text: "#FFFFFF" },
   "8":  { bg: "#E6007E", text: "#FFFFFF" },
   "9":  { bg: "#00A5E3", text: "#FFFFFF" },
   "10": { bg: "#C4D600", text: "#000000" },
   "11": { bg: "#1D1D1B", text: "#FFFFFF" },
-  "13": { bg: "#6F2282", text: "#FFFFFF" },
+  "12": { bg: "#6D6E71", text: "#FFFFFF" },
   // Stombussar
   "17": { bg: "#0066B3", text: "#FFFFFF" },
   "18": { bg: "#1D1D5C", text: "#FFFFFF" },
   "19": { bg: "#009640", text: "#FFFFFF" },
   "21": { bg: "#B5121B", text: "#FFFFFF" },
   "25": { bg: "#006461", text: "#FFFFFF" },
-  // Expressbussar
-  "X1":  { bg: "#F5A623", text: "#000000" },
-  "X2":  { bg: "#E87CAC", text: "#000000" },
-  "X3":  { bg: "#0066B3", text: "#FFFFFF" },
-  "X4":  { bg: "#7BC144", text: "#000000" },
-  "X5":  { bg: "#1D1D1B", text: "#FFFFFF" },
-  "X6":  { bg: "#E3000B", text: "#FFFFFF" },
-  "X40": { bg: "#C4D600", text: "#000000" },
-  "X76": { bg: "#E6007E", text: "#FFFFFF" },
-  "X77": { bg: "#F39100", text: "#FFFFFF" },
-  "X90": { bg: "#E87CAC", text: "#000000" },
+  // Expressbussar — alla har samma limegröna badge
+  "X1":  { bg: "#78BE20", text: "#FFFFFF" },
+  "X2":  { bg: "#78BE20", text: "#FFFFFF" },
+  "X3":  { bg: "#78BE20", text: "#FFFFFF" },
+  "X4":  { bg: "#78BE20", text: "#FFFFFF" },
+  "X5":  { bg: "#78BE20", text: "#FFFFFF" },
+  "X6":  { bg: "#78BE20", text: "#FFFFFF" },
+  "X40": { bg: "#78BE20", text: "#FFFFFF" },
+  "X76": { bg: "#78BE20", text: "#FFFFFF" },
+  "X77": { bg: "#78BE20", text: "#FFFFFF" },
+  "X90": { bg: "#78BE20", text: "#FFFFFF" },
   // Färjor
-  "286": { bg: "#009640", text: "#FFFFFF" },
-  "287": { bg: "#009640", text: "#FFFFFF" },
-  "285": { bg: "#00A5E3", text: "#FFFFFF" },
-  "281": { bg: "#009640", text: "#FFFFFF" },
-  "282": { bg: "#009640", text: "#FFFFFF" },
-  "283": { bg: "#009640", text: "#FFFFFF" },
-  "284": { bg: "#009640", text: "#FFFFFF" },
+  "281": { bg: "#0066B3", text: "#FFFFFF" },
+  "282": { bg: "#0066B3", text: "#FFFFFF" },
+  "283": { bg: "#0066B3", text: "#FFFFFF" },
+  "284": { bg: "#0066B3", text: "#FFFFFF" },
+  "285": { bg: "#006461", text: "#FFFFFF" },
+  "286": { bg: "#F39100", text: "#FFFFFF" },
+  "287": { bg: "#E6007E", text: "#FFFFFF" },
 };
 
 const TRANSPORT_STOP: Record<string, string> = {
@@ -347,19 +349,23 @@ export default function DeparturesPage({ embedded }: { embedded?: boolean }) {
           </div>
         )}
 
-        {data && data.departures.length > 0 && (
-          <GroupedDepartures
-            search={activeSearch}
-            departures={
-              activeSearch.trim()
-                ? data.departures.filter((d) => {
-                    const q = activeSearch.toLowerCase();
-                    return d.line.toLowerCase().includes(q) || d.destination.toLowerCase().includes(q) || d.transportType.toLowerCase().includes(q);
-                  })
-                : data.departures
-            }
-          />
-        )}
+        {data && data.departures.length > 0 && (() => {
+          // Filter by visibility settings
+          const showBus = settings?.departure_show_bus !== "false";
+          const showTram = settings?.departure_show_tram !== "false";
+          const showFerry = settings?.departure_show_ferry !== "false";
+          const visibilityMap: Record<string, boolean> = { Buss: showBus, Spårvagn: showTram, Färja: showFerry };
+          const visibleDepartures = data.departures.filter((d) => visibilityMap[d.transportType] !== false);
+
+          const filtered = activeSearch.trim()
+            ? visibleDepartures.filter((d) => {
+                const q = activeSearch.toLowerCase();
+                return d.line.toLowerCase().includes(q) || d.destination.toLowerCase().includes(q) || d.transportType.toLowerCase().includes(q);
+              })
+            : visibleDepartures;
+
+          return <GroupedDepartures search={activeSearch} departures={filtered} />;
+        })()}
 
 
         <p className="text-xs text-muted-foreground text-center pt-2 pb-8">
