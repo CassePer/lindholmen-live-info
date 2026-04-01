@@ -12,6 +12,13 @@ const DEFAULT_STOP_BUS = '740059410';
 const DEFAULT_STOP_TRAM = '740059410';
 const DEFAULT_STOP_FERRY = '740059412';
 
+interface TrafiklabAlert {
+  header?: string;
+  description?: string;
+  valid_from?: string;
+  valid_to?: string;
+}
+
 interface TrafiklabDeparture {
   scheduled: string;
   realtime?: string;
@@ -37,7 +44,7 @@ interface TrafiklabDeparture {
     id: string;
     name: string;
   };
-  alerts: unknown[];
+  alerts: TrafiklabAlert[];
 }
 
 interface TrafiklabResponse {
