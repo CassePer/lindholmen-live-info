@@ -19,12 +19,14 @@ const TRANSPORT_ICON: Record<TransportType, React.ReactNode> = {
   Färja: <Ship className="h-5 w-5" />,
   Spårvagn: <Train className="h-5 w-5" />,
   Buss: <Bus className="h-5 w-5" />,
+  Tåg: <Train className="h-5 w-5" />,
 };
 
 const TRANSPORT_COLORS: Record<TransportType, string> = {
   Färja: "bg-ferry text-primary-foreground",
   Spårvagn: "bg-tram text-primary-foreground",
   Buss: "bg-bus text-primary-foreground",
+  Tåg: "bg-tram text-primary-foreground",
 };
 
 // Official Västtrafik line colors: trams, trunk buses, express buses, ferries
