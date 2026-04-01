@@ -1,40 +1,100 @@
 
 
-## Plan: Spårvagnsfärger per linje + Fixa ghost-knappar på TV
+## Plan: Korrigera linjefärger, felsök busstider, admin för avgångsplatser och synlighet
 
-### 1. Lägg till spårvagnsfärger per linje
+### 1. Korrigera linjefärger enligt bilderna
 
-**Fil: `src/pages/DeparturesPage.tsx`**
+Baserat på bilderna — de korrekta badge-färgerna:
 
-Lägg till en `TRAM_LINE_COLORS`-map med Göteborgs spårvagnslinjer och deras officiella färger:
+**Spårvagnar:**
+| Linje | Badge-färg | Text |
+|-------|-----------|------|
+| 1 | Mörk/svart `#333333` | Vit |
+| 2 | Vit `#FFFFFF` | Svart (border) |
+| 3 | Blå `#004B93` | Vit |
+| 4 | Grön `#009640` | Vit |
+| 5 | Röd/korall `#E3000B` | Vit |
+| 6 | Gul `#FFD700` | Svart |
+| 7 | Brun `#8B4513` | Vit |
+| 8 | Rosa `#E6007E` | Vit |
+| 9 | Ljusblå `#00A5E3` | Vit |
+| 10 | Gulgrön `#C4D600` | Svart |
+| 11 | Svart `#1D1D1B` | Vit |
+| 12 | Grå `#6D6E71` | Vit |
 
-| Linje | Färg | Hex |
-|-------|------|-----|
-| 1 | Vit | `#FFFFFF` (svart text) |
-| 2 | Gul | `#FFD700` (svart text) |
-| 3 | Blå | `#0066B3` |
-| 4 | Grön | `#009640` |
-| 5 | Röd | `#E3000B` |
-| 6 | Orange | `#F39100` |
-| 7 | Brun | `#8B4513` |
-| 8 | Rosa | `#E6007E` |
-| 9 | Blå | `#00A5E3` |
-| 10 | Gul/grön | `#C4D600` (svart text) |
-| 11 | Svart/vit | `#1D1D1B` |
-| 13 | Mörklila | `#6F2282` |
+**Stombussar:**
+| Linje | Badge-färg | Text |
+|-------|-----------|------|
+| 17 | Blå `#0066B3` | Vit |
+| 18 | Marinblå `#1D1D5C` | Vit |
+| 19 | Grön `#009640` | Vit |
+| 21 | Röd `#B5121B` | Vit |
+| 25 | Teal `#006461` | Vit |
 
-I `DepartureRow` — om `dep.transportType === "Spårvagn"`, använd inline `style` med `backgroundColor` och `color` från mappen istället för den generiska `TRANSPORT_COLORS`-klassen.
+**Expressbussar** — alla har SAMMA limegröna badge:
+| Linje | Badge-färg | Text |
+|-------|-----------|------|
+| X1–X90 | Limegrön `#78BE20` | Vit |
 
-### 2. Fixa ghost-knappar (Sök/Refresh) för TV-läge
+**Färjor** (från bilden):
+| Linje | Badge-färg | Text |
+|-------|-----------|------|
+| 281–284 | Blå `#0066B3` | Vit |
+| 285 | Teal `#006461` | Vit |
+| 286 | Orange `#F39100` | Vit |
+| 287 | Rosa `#E6007E` | Vit |
 
-Problemet: `variant="ghost"`-knappar har nästan osynliga ikoner mot den ljusa bakgrunden i ljust tema.
+**Fil:** `src/pages/DeparturesPage.tsx` — uppdatera `LINE_COLORS`
 
-**Fil: `src/index.css`** — Justera dark-mode CSS-variablerna så ghost-knappens `hover:bg-accent` ger bättre kontrast. Alternativt, ändra `--muted-foreground` i ljust läge till en mörkare nyans så ikonerna syns bättre.
+### 2. Felsök saknade busstider
 
-Konkret: ändra ljust läges `--muted-foreground` från `220 10% 46%` till `220 10% 38%` (mörkare grå), samt `--accent` från `25 85% 58%` till `220 10% 90%` (neutral ljusgrå istället för orange) för hover-bakgrund, så att ghost-knappar får en subtil grå hover istället.
+Koden ser korrekt ut — buss mappar till `transport_mode_code` 700. Troligtvis ett tillfälligt API-problem, men jag lägger till bättre felhantering och loggning:
+- I edge function: logga antal avgångar per transporttyp som returneras
+- Frontend: visa tydligare felmeddelande om ett specifikt transportslag saknar data
+
+**Fil:** `supabase/functions/departures/index.ts` — lägg till debug-loggning
+
+### 3. Admin: konfigurera hållplats-ID per transporttyp
+
+Lägg till nya `app_settings`-nycklar:
+- `departure_stop_bus` (default: `740059410`)
+- `departure_stop_tram` (default: `740059410`)
+- `departure_stop_ferry` (default: `740059412`)
+
+Admin-UI: tre inputfält med "Hållplats-ID" per transporttyp med sparknapp.
+
+Edge function: läs stop-IDs från `app_settings` istället för hårdkodade konstanter.
+
+**Filer:**
+- `src/pages/AdminPage.tsx` — nytt avsnitt "Avgångar – hållplatser"
+- `supabase/functions/departures/index.ts` — hämta stop-IDs från DB
+
+### 4. Admin: visa/dölj transporttyper (checkboxar)
+
+Nya `app_settings`-nycklar:
+- `departure_show_bus` (default: `"true"`)
+- `departure_show_tram` (default: `"true"`)
+- `departure_show_ferry` (default: `"true"`)
+
+Admin-UI: tre checkboxar under avgångsinställningarna.
+
+Frontend: `DeparturesPage` filtrerar bort dolda transporttyper baserat på settings.
+
+**Filer:**
+- `src/pages/AdminPage.tsx` — checkboxar
+- `src/pages/DeparturesPage.tsx` — filtrera på settings
+
+### 5. Förslag på ytterligare förbättringar
+
+Några saker att överväga:
+- **Max antal avgångar per grupp** (konfigurerbart i admin)
+- **Tidsfilter** — visa bara avgångar inom X minuter framåt (konfigurerbart)
+- **Pendeltåg som transporttyp** — edge function mappar redan `code 100` till "Tåg" men det ingår inte i `TransportType`-typen
 
 ### Filer som ändras
 
-- `src/pages/DeparturesPage.tsx` — linjefärgskarta + uppdaterad `DepartureRow`
-- `src/index.css` — justerade ljust-tema-variabler för bättre ghost-knapps-kontrast
+- `src/pages/DeparturesPage.tsx` — färgfix + filtrera dolda transporttyper
+- `src/pages/AdminPage.tsx` — hållplats-IDs + checkboxar för synlighet
+- `supabase/functions/departures/index.ts` — dynamiska stop-IDs från DB + loggning
+- `src/api/types.ts` — eventuellt lägga till "Tåg" i `TransportType`
 
