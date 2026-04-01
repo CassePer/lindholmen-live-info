@@ -66,8 +66,16 @@ export interface Departure {
   realtimeIso?: string;
 }
 
+export interface DepartureAlert {
+  header: string;
+  description: string;
+  validFrom?: string;
+  validTo?: string;
+}
+
 export interface DeparturesResponse {
   departures: Departure[];
+  alerts?: DepartureAlert[];
   updatedAt: string;
   areaId?: string;
   stopName?: string;
