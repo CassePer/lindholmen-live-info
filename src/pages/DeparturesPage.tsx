@@ -215,6 +215,37 @@ function GroupedDepartures({ departures, search, globalAlerts }: { departures: D
                   </span>
                 </CardTitle>
               </CardHeader>
+              {/* Alerts for this transport group */}
+              {(() => {
+                const groupAlerts = new Map<string, DepartureAlert>();
+                // Collect from individual departures
+                for (const dep of group.items) {
+                  if (dep.alerts) {
+                    for (const a of dep.alerts) {
+                      const key = `${a.header}|${a.description}`;
+                      if (!groupAlerts.has(key)) groupAlerts.set(key, a);
+                    }
+                  }
+                }
+                // Also check global alerts (shown on first group that has items, or all)
+                const alerts = [...groupAlerts.values()];
+                if (alerts.length === 0) return null;
+                return (
+                  <div className="px-6 pb-0">
+                    {alerts.map((alert, ai) => (
+                      <Alert key={ai} className="mb-2 border-warning/50 bg-warning/10">
+                        <AlertTriangle className="h-4 w-4 text-warning" />
+                        <AlertDescription className="ml-2">
+                          <span className="font-semibold text-sm">{alert.header}</span>
+                          {alert.description && (
+                            <p className="text-xs text-muted-foreground mt-0.5">{alert.description}</p>
+                          )}
+                        </AlertDescription>
+                      </Alert>
+                    ))}
+                  </div>
+                );
+              })()}
               <CardContent>
                 {group.items.length === 0 && (
                   <p className="text-sm text-muted-foreground py-4 text-center">
