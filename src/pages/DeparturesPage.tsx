@@ -159,7 +159,7 @@ function splitDepartures(items: Departure[]): { past: Departure[]; upcoming: Dep
   return { past, upcoming };
 }
 
-function GroupedDepartures({ departures, search }: { departures: Departure[]; search: string }) {
+function GroupedDepartures({ departures, search, globalAlerts }: { departures: Departure[]; search: string; globalAlerts?: DepartureAlert[] }) {
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   const grouped = TRANSPORT_ORDER.map((type) => ({
