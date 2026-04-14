@@ -3,10 +3,16 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getLunchMenus } from "@/services/lunch";
 import { useAppSettings } from "@/hooks/use-app-settings";
 
+function isWeekend() {
+  const day = new Date().getDay();
+  return day === 0 || day === 6;
+}
+
 export function useLunchMenus() {
   const queryClient = useQueryClient();
   const { data: settings } = useAppSettings();
   const refreshHour = parseInt(settings?.lunch_auto_refresh_hour ?? "10", 10);
+  const updateWeekends = settings?.lunch_update_weekends !== "false";
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
 
   const forceRefresh = useCallback(() => {
@@ -24,6 +30,14 @@ export function useLunchMenus() {
       if (target <= now) {
         target.setDate(target.getDate() + 1);
       }
+
+      // Skip weekends if setting is off
+      if (!updateWeekends) {
+        while (target.getDay() === 0 || target.getDay() === 6) {
+          target.setDate(target.getDate() + 1);
+        }
+      }
+
       const ms = target.getTime() - now.getTime();
       timerRef.current = setTimeout(() => {
         forceRefresh();
@@ -32,7 +46,7 @@ export function useLunchMenus() {
     }
     scheduleNext();
     return () => clearTimeout(timerRef.current);
-  }, [refreshHour, forceRefresh]);
+  }, [refreshHour, updateWeekends, forceRefresh]);
 
   return useQuery({
     queryKey: ["lunch"],

@@ -208,7 +208,8 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
   const [stopTram, setStopTram] = useState<string | null>(null);
   const [stopFerry, setStopFerry] = useState<string | null>(null);
 
-  const currentInterval = refreshInterval ?? settings?.departure_refresh_interval ?? "60";
+  const currentIntervalSec = parseInt(refreshInterval ?? settings?.departure_refresh_interval ?? "60", 10);
+  const currentIntervalMin = String(Math.round(currentIntervalSec / 60) || 1);
   const currentLunchHour = lunchHour ?? settings?.lunch_auto_refresh_hour ?? "10";
   const currentStopBus = stopBus ?? settings?.departure_stop_bus ?? "740059410";
   const currentStopTram = stopTram ?? settings?.departure_stop_tram ?? "740059410";
@@ -216,6 +217,8 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
   const showBus = settings?.departure_show_bus !== "false";
   const showTram = settings?.departure_show_tram !== "false";
   const showFerry = settings?.departure_show_ferry !== "false";
+  const lunchWeekends = settings?.lunch_update_weekends !== "false";
+  const departureWeekends = settings?.departure_update_weekends !== "false";
 
   const addMutation = useMutation({
     mutationFn: async () => {
@@ -288,10 +291,10 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
           </CardHeader>
           <CardContent className="space-y-3">
             <div>
-              <label className="text-sm font-medium mb-1 block">Avgångar – uppdateringsintervall (sekunder)</label>
+              <label className="text-sm font-medium mb-1 block">Avgångar – uppdateringsintervall (minuter)</label>
               <div className="flex gap-2">
-                <Input type="number" min="10" max="300" value={currentInterval} onChange={(e) => setRefreshInterval(e.target.value)} className="w-32" />
-                <Button size="sm" onClick={() => saveSettingMutation.mutate({ key: "departure_refresh_interval", value: currentInterval })} disabled={saveSettingMutation.isPending}>
+                <Input type="number" min="1" max="10" value={currentIntervalMin} onChange={(e) => setRefreshInterval(String(parseInt(e.target.value, 10) * 60 || 60))} className="w-32" />
+                <Button size="sm" onClick={() => saveSettingMutation.mutate({ key: "departure_refresh_interval", value: String(currentIntervalSec) })} disabled={saveSettingMutation.isPending}>
                   {saveSettingMutation.isPending ? "Sparar..." : "Spara"}
                 </Button>
               </div>
@@ -324,6 +327,20 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
                   {saveSettingMutation.isPending ? "Sparar..." : "Spara"}
                 </Button>
               </div>
+            </div>
+            <div className="border-t pt-3 mt-3">
+              <p className="text-sm font-medium mb-2">Helguppdateringar</p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox id="lunch-weekends" checked={lunchWeekends} onCheckedChange={(v) => saveSettingMutation.mutate({ key: "lunch_update_weekends", value: String(v) })} />
+                  <Label htmlFor="lunch-weekends">Uppdatera lunchmenyer på helger</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox id="departure-weekends" checked={departureWeekends} onCheckedChange={(v) => saveSettingMutation.mutate({ key: "departure_update_weekends", value: String(v) })} />
+                  <Label htmlFor="departure-weekends">Uppdatera avgångar på helger</Label>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Om avaktiverat pausas automatiska uppdateringar på lördagar och söndagar.</p>
             </div>
           </CardContent>
         </Card>

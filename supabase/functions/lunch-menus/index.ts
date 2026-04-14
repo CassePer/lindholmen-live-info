@@ -343,14 +343,16 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Parse force parameter from body or query
+    // Parse force and restaurantId parameters from body or query
     let force = false;
+    let singleRestaurantId: string | null = null;
     try {
       const url = new URL(req.url);
       if (url.searchParams.get('force') === 'true') force = true;
       if (req.method === 'POST') {
         const body = await req.json().catch(() => null);
         if (body?.force) force = true;
+        if (body?.restaurantId) singleRestaurantId = body.restaurantId;
       }
     } catch { /* ignore parse errors */ }
 
@@ -377,7 +379,11 @@ Deno.serve(async (req) => {
       .eq('week_key', todayKey);
 
     if (!cacheError && cached && cached.length > 0) {
-      if (force) {
+      // Single restaurant refresh — bypass cooldown, re-scrape only one
+      if (singleRestaurantId) {
+        console.log(`Single restaurant refresh for ${singleRestaurantId}`);
+        // Will scrape just this one below
+      } else if (force) {
         // Check cooldown: only allow force refresh if cache is older than 30 minutes
         const COOLDOWN_MS = 30 * 60 * 1000;
         const newest = cached.reduce((a: any, b: any) =>
@@ -408,11 +414,16 @@ Deno.serve(async (req) => {
     }
 
     // Fetch restaurants from DB
-    const { data: restaurants, error: restError } = await supabase
+    let restaurantQuery = supabase
       .from('restaurants')
       .select('*')
-      .eq('active', true)
-      .order('name');
+      .eq('active', true);
+    
+    if (singleRestaurantId) {
+      restaurantQuery = restaurantQuery.eq('id', singleRestaurantId);
+    }
+
+    const { data: restaurants, error: restError } = await restaurantQuery.order('name');
 
     if (restError || !restaurants?.length) {
       console.error('Failed to load restaurants:', restError);
@@ -421,7 +432,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    console.log(`No cache for ${todayKey}. Scraping ${restaurants.length} restaurants...`);
+    console.log(`Scraping ${restaurants.length} restaurant(s)...`);
 
     const BATCH_SIZE = 4;
     const allMenus: unknown[] = [];
@@ -513,6 +524,19 @@ Deno.serve(async (req) => {
       console.error('Cache insert error:', insertError);
     } else {
       console.log(`Cached ${rows.length} menus for ${todayKey}`);
+    }
+
+    // If single restaurant refresh, merge with existing cached menus and return full list
+    if (singleRestaurantId && cached && cached.length > 0) {
+      const updatedIds = new Set(allMenus.map((m: any) => m.restaurantId));
+      const existingMenus = cached
+        .filter((row: any) => !updatedIds.has(row.menu_data.restaurantId))
+        .map((row: any) => row.menu_data);
+      const merged = [...existingMenus, ...allMenus];
+      console.log(`Merged: ${allMenus.length} refreshed + ${existingMenus.length} cached = ${merged.length} total`);
+      return new Response(JSON.stringify(merged), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     console.log(`Done. Got menus for ${(allMenus as any[]).filter((m: any) => m.dishes.length > 0).length}/${restaurants.length} restaurants.`);
