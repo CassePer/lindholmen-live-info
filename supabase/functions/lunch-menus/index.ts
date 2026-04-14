@@ -414,11 +414,16 @@ Deno.serve(async (req) => {
     }
 
     // Fetch restaurants from DB
-    const { data: restaurants, error: restError } = await supabase
+    let restaurantQuery = supabase
       .from('restaurants')
       .select('*')
-      .eq('active', true)
-      .order('name');
+      .eq('active', true);
+    
+    if (singleRestaurantId) {
+      restaurantQuery = restaurantQuery.eq('id', singleRestaurantId);
+    }
+
+    const { data: restaurants, error: restError } = await restaurantQuery.order('name');
 
     if (restError || !restaurants?.length) {
       console.error('Failed to load restaurants:', restError);
@@ -427,7 +432,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    console.log(`No cache for ${todayKey}. Scraping ${restaurants.length} restaurants...`);
+    console.log(`Scraping ${restaurants.length} restaurant(s)...`);
 
     const BATCH_SIZE = 4;
     const allMenus: unknown[] = [];
