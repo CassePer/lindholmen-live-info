@@ -328,10 +328,20 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
                 </Button>
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Departure stops & visibility */}
+            <div className="border-t pt-3 mt-3">
+              <p className="text-sm font-medium mb-2">Helguppdateringar</p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox id="lunch-weekends" checked={lunchWeekends} onCheckedChange={(v) => saveSettingMutation.mutate({ key: "lunch_update_weekends", value: String(v) })} />
+                  <Label htmlFor="lunch-weekends">Uppdatera lunchmenyer på helger</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox id="departure-weekends" checked={departureWeekends} onCheckedChange={(v) => saveSettingMutation.mutate({ key: "departure_update_weekends", value: String(v) })} />
+                  <Label htmlFor="departure-weekends">Uppdatera avgångar på helger</Label>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Om avaktiverat pausas automatiska uppdateringar på lördagar och söndagar.</p>
+            </div>
         <Card className="glass-card">
           <CardHeader>
             <CardTitle className="text-base font-display flex items-center gap-2"><MapPin className="h-4 w-4" /> Avgångar – hållplatser & synlighet</CardTitle>
