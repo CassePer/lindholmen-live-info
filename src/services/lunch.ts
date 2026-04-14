@@ -5,9 +5,13 @@ import type { LunchMenu } from "@/api/types";
  * Fetch today's lunch menus via the edge function.
  * The edge function handles caching internally.
  */
-export async function getLunchMenus(force = false): Promise<LunchMenu[]> {
+export async function getLunchMenus(force = false, restaurantId?: string): Promise<LunchMenu[]> {
+  const body: Record<string, unknown> = {};
+  if (force) body.force = true;
+  if (restaurantId) body.restaurantId = restaurantId;
+
   const { data, error } = await supabase.functions.invoke("lunch-menus", {
-    body: force ? { force: true } : null,
+    body: Object.keys(body).length > 0 ? body : null,
   });
 
   if (error) {
