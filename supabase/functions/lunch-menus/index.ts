@@ -379,7 +379,11 @@ Deno.serve(async (req) => {
       .eq('week_key', todayKey);
 
     if (!cacheError && cached && cached.length > 0) {
-      if (force) {
+      // Single restaurant refresh — bypass cooldown, re-scrape only one
+      if (singleRestaurantId) {
+        console.log(`Single restaurant refresh for ${singleRestaurantId}`);
+        // Will scrape just this one below
+      } else if (force) {
         // Check cooldown: only allow force refresh if cache is older than 30 minutes
         const COOLDOWN_MS = 30 * 60 * 1000;
         const newest = cached.reduce((a: any, b: any) =>
