@@ -526,6 +526,19 @@ Deno.serve(async (req) => {
       console.log(`Cached ${rows.length} menus for ${todayKey}`);
     }
 
+    // If single restaurant refresh, merge with existing cached menus and return full list
+    if (singleRestaurantId && cached && cached.length > 0) {
+      const updatedIds = new Set(allMenus.map((m: any) => m.restaurantId));
+      const existingMenus = cached
+        .filter((row: any) => !updatedIds.has(row.menu_data.restaurantId))
+        .map((row: any) => row.menu_data);
+      const merged = [...existingMenus, ...allMenus];
+      console.log(`Merged: ${allMenus.length} refreshed + ${existingMenus.length} cached = ${merged.length} total`);
+      return new Response(JSON.stringify(merged), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     console.log(`Done. Got menus for ${(allMenus as any[]).filter((m: any) => m.dishes.length > 0).length}/${restaurants.length} restaurants.`);
 
     return new Response(JSON.stringify(allMenus), {
