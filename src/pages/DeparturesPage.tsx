@@ -401,7 +401,7 @@ export default function DeparturesPage({ embedded }: { embedded?: boolean }) {
 
 
         <p className="text-xs text-muted-foreground text-center pt-2 pb-8">
-          Uppdateras automatiskt var {intervalSec}:e sekund · Data från Trafiklab.se
+          Uppdateras automatiskt var {Math.round(intervalSec / 60) || 1}:e minut · Data från Trafiklab.se
         </p>
       </div>
   );
