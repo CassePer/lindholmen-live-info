@@ -82,7 +82,7 @@ const cardVariants = {
   }),
 };
 
-function RestaurantCard({ menu, search }: { menu: LunchMenu; search: string }) {
+function RestaurantCard({ menu, search, onRefresh, isRefreshing }: { menu: LunchMenu; search: string; onRefresh: (id: string) => void; isRefreshing: boolean }) {
   const mapsUrl = menu.address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(menu.address)}`
     : undefined;
@@ -107,15 +107,25 @@ function RestaurantCard({ menu, search }: { menu: LunchMenu; search: string }) {
               </a>
             )}
           </div>
-          <a
-            href={menu.websiteUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-shrink-0 text-muted-foreground hover:text-primary transition-colors"
-            aria-label={`Besök ${menu.restaurantName}s webbplats`}
-          >
-            <ExternalLink className="h-4 w-4" />
-          </a>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <button
+              onClick={() => onRefresh(menu.restaurantId)}
+              disabled={isRefreshing}
+              className="text-muted-foreground hover:text-primary transition-colors p-1"
+              aria-label={`Uppdatera ${menu.restaurantName}s meny`}
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+            </button>
+            <a
+              href={menu.websiteUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-muted-foreground hover:text-primary transition-colors p-1"
+              aria-label={`Besök ${menu.restaurantName}s webbplats`}
+            >
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-2">
@@ -146,6 +156,7 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
   const { data, isLoading, error } = useLunchMenus();
   const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshingId, setRefreshingId] = useState<string | null>(null);
 
   const activeSearch = showSearch ? search : "";
 
@@ -168,6 +179,26 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
       queryClient.invalidateQueries({ queryKey: ["lunch"] });
     } finally {
       setIsRefreshing(false);
+    }
+  };
+
+  const handleRefreshSingle = async (restaurantId: string) => {
+    setRefreshingId(restaurantId);
+    try {
+      const freshData = await getLunchMenus(true, restaurantId);
+      if (freshData && typeof freshData === 'object' && 'cooldown' in freshData) {
+        const cd = freshData as any;
+        toast.info(`Menyn uppdaterades nyligen. Försök igen om ${cd.minutesLeft} min.`);
+        if (cd.menus) queryClient.setQueryData(["lunch"], cd.menus);
+      } else {
+        queryClient.setQueryData(["lunch"], freshData);
+        toast.success("Menyn har uppdaterats!");
+      }
+    } catch (err) {
+      console.error("Single refresh failed:", err);
+      toast.error("Kunde inte uppdatera menyn.");
+    } finally {
+      setRefreshingId(null);
     }
   };
 
@@ -229,7 +260,7 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
                 exit={{ opacity: 0, scale: 0.95 }}
                 layout
               >
-                <RestaurantCard menu={menu} search={activeSearch} />
+                <RestaurantCard menu={menu} search={activeSearch} onRefresh={handleRefreshSingle} isRefreshing={refreshingId === menu.restaurantId} />
               </motion.div>
             ))}
           </AnimatePresence>
