@@ -343,14 +343,16 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Parse force parameter from body or query
+    // Parse force and restaurantId parameters from body or query
     let force = false;
+    let singleRestaurantId: string | null = null;
     try {
       const url = new URL(req.url);
       if (url.searchParams.get('force') === 'true') force = true;
       if (req.method === 'POST') {
         const body = await req.json().catch(() => null);
         if (body?.force) force = true;
+        if (body?.restaurantId) singleRestaurantId = body.restaurantId;
       }
     } catch { /* ignore parse errors */ }
 
