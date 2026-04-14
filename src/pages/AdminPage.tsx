@@ -342,6 +342,10 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
               </div>
               <p className="text-xs text-muted-foreground mt-1">Om avaktiverat pausas automatiska uppdateringar på lördagar och söndagar.</p>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Departure stops & visibility */}
         <Card className="glass-card">
           <CardHeader>
             <CardTitle className="text-base font-display flex items-center gap-2"><MapPin className="h-4 w-4" /> Avgångar – hållplatser & synlighet</CardTitle>
