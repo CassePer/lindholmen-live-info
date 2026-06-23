@@ -434,7 +434,7 @@ Deno.serve(async (req) => {
 
     if (restError || !restaurants?.length) {
       console.error('Failed to load restaurants:', restError);
-      return new Response(JSON.stringify([]), {
+      return new Response(JSON.stringify({ menus: [] }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
