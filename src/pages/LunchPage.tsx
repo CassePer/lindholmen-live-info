@@ -10,6 +10,7 @@ import { ExternalLink, Search as SearchIcon, AlertCircle, MapPin, RefreshCw } fr
 import { motion, AnimatePresence } from "framer-motion";
 import { getLunchMenus } from "@/services/lunch";
 import { useQueryClient } from "@tanstack/react-query";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { LunchMenu, DietTag } from "@/api/types";
 
 const TAG_LABELS: Record<DietTag, string> = {
@@ -73,6 +74,74 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("sv-SE", { year: "numeric", month: "2-digit", day: "2-digit" });
 }
 
+const SE_WEEKDAYS = ["mån", "tis", "ons", "tors", "fre"];
+
+function stockholmParts(d: Date) {
+  const parts = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Stockholm",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(d);
+  const weekday = parts.find((p) => p.type === "weekday")?.value ?? "";
+  const hour = parseInt(parts.find((p) => p.type === "hour")?.value ?? "0", 10);
+  const minute = parseInt(parts.find((p) => p.type === "minute")?.value ?? "0", 10);
+  return { weekday, hour, minute };
+}
+
+function fmtStockholmHHMM(d: Date) {
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Stockholm",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(d);
+}
+
+function getRefreshState(
+  updatedAt: string | undefined,
+  now: Date = new Date()
+): { allowed: boolean; reason?: string; nextLabel?: string } {
+  const { weekday, hour } = stockholmParts(now);
+  const isWeekday = SE_WEEKDAYS.includes(weekday);
+  const inWindow = isWeekday && hour >= 8 && hour < 14;
+
+  if (!inWindow) {
+    let nextLabel: string;
+    if (!isWeekday) {
+      nextLabel = "Öppnar måndag kl 08:00";
+    } else if (hour < 8) {
+      nextLabel = "Öppnar idag kl 08:00";
+    } else {
+      nextLabel = weekday === "fre" ? "Öppnar måndag kl 08:00" : "Öppnar imorgon kl 08:00";
+    }
+    return {
+      allowed: false,
+      reason: "Hämtning är endast tillåten vardagar kl 08–14.",
+      nextLabel,
+    };
+  }
+
+  const cooldownEnd = updatedAt ? new Date(new Date(updatedAt).getTime() + 60 * 60 * 1000) : null;
+  if (cooldownEnd && cooldownEnd > now) {
+    const cd = stockholmParts(cooldownEnd);
+    const cdInWindow = SE_WEEKDAYS.includes(cd.weekday) && cd.hour >= 8 && cd.hour < 14;
+    const nextLabel = cdInWindow
+      ? `Nästa uppdatering kl ${fmtStockholmHHMM(cooldownEnd)}`
+      : weekday === "fre"
+      ? "Nästa uppdatering måndag kl 08:00"
+      : "Nästa uppdatering imorgon kl 08:00";
+    return {
+      allowed: false,
+      reason: "Menyn uppdaterades inom senaste timmen.",
+      nextLabel,
+    };
+  }
+
+  return { allowed: true };
+}
+
 const cardVariants = {
   hidden: { opacity: 0, y: 20 },
   visible: (i: number) => ({
@@ -86,6 +155,8 @@ function RestaurantCard({ menu, search, onRefresh, isRefreshing }: { menu: Lunch
   const mapsUrl = menu.address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(menu.address)}`
     : undefined;
+  const refreshState = getRefreshState(menu.updatedAt);
+  const refreshDisabled = !refreshState.allowed || isRefreshing;
 
   return (
     <Card className="glass-card hover-scale">
@@ -108,14 +179,31 @@ function RestaurantCard({ menu, search, onRefresh, isRefreshing }: { menu: Lunch
             )}
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
-            <button
-              onClick={() => onRefresh(menu.restaurantId)}
-              disabled={isRefreshing}
-              className="text-muted-foreground hover:text-primary transition-colors p-1"
-              aria-label={`Uppdatera ${menu.restaurantName}s meny`}
-            >
-              <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => refreshState.allowed && onRefresh(menu.restaurantId)}
+                  disabled={refreshDisabled}
+                  className="text-muted-foreground hover:text-primary transition-colors p-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-muted-foreground"
+                  aria-label={`Uppdatera ${menu.restaurantName}s meny`}
+                  aria-disabled={refreshDisabled}
+                >
+                  <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-[220px] text-xs">
+                {refreshState.allowed
+                  ? "Uppdatera meny"
+                  : (
+                      <span className="flex flex-col gap-0.5">
+                        <span>{refreshState.reason}</span>
+                        {refreshState.nextLabel && (
+                          <span className="text-muted-foreground">{refreshState.nextLabel}</span>
+                        )}
+                      </span>
+                    )}
+              </TooltipContent>
+            </Tooltip>
             <a
               href={menu.websiteUrl}
               target="_blank"
@@ -145,6 +233,9 @@ function RestaurantCard({ menu, search, onRefresh, isRefreshing }: { menu: Lunch
         <p className="text-xs text-muted-foreground pt-2">
           Uppdaterad: {formatDate(menu.updatedAt)} kl {formatTime(menu.updatedAt)}
         </p>
+        {!refreshState.allowed && refreshState.nextLabel && (
+          <p className="text-xs text-muted-foreground/80 italic">{refreshState.nextLabel}</p>
+        )}
       </CardContent>
     </Card>
   );
