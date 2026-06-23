@@ -18,6 +18,25 @@ function getTodayKey(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+/** Check if current time (Europe/Stockholm) is within allowed fetch window:
+ *  weekdays (Mon-Fri), hours 08:00-13:59. */
+function isWithinFetchWindow(date: Date): { allowed: boolean; reason?: string } {
+  const parts = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Europe/Stockholm',
+    weekday: 'short',
+    hour: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+  const weekday = parts.find((p) => p.type === 'weekday')?.value ?? '';
+  const hourStr = parts.find((p) => p.type === 'hour')?.value ?? '0';
+  const hour = parseInt(hourStr, 10);
+  // sv-SE short weekday: mån, tis, ons, tors, fre, lör, sön
+  const isWeekday = ['mån', 'tis', 'ons', 'tors', 'fre'].includes(weekday);
+  if (!isWeekday) return { allowed: false, reason: 'Hämtning av menyer är endast tillåten på vardagar (mån–fre).' };
+  if (hour < 8 || hour >= 14) return { allowed: false, reason: 'Hämtning av menyer är endast tillåten kl 08–14.' };
+  return { allowed: true };
+}
+
 interface ScrapeResult {
   markdown: string | null;
   screenshot: string | null;
@@ -388,9 +407,43 @@ Deno.serve(async (req) => {
     if (!cacheError && cached && cached.length > 0) {
       // Single restaurant refresh — bypass cooldown, re-scrape only one
       if (singleRestaurantId) {
+        // Window check: only allow scraping on weekdays 08–14
+        const window = isWithinFetchWindow(now);
+        if (!window.allowed) {
+          console.log(`Single refresh blocked – outside fetch window: ${window.reason}`);
+          const menus = cached.map((row: any) => row.menu_data);
+          return new Response(
+            JSON.stringify({ cooldown: true, minutesLeft: 0, reason: window.reason, menus }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        // Per-restaurant 1h cooldown
+        const PER_REST_COOLDOWN_MS = 60 * 60 * 1000;
+        const existing = cached.find((row: any) => (row.menu_data as any)?.restaurantId === singleRestaurantId);
+        if (existing) {
+          const ageMs = now.getTime() - new Date(existing.created_at).getTime();
+          if (ageMs < PER_REST_COOLDOWN_MS) {
+            const minutesLeft = Math.ceil((PER_REST_COOLDOWN_MS - ageMs) / 60000);
+            console.log(`Per-restaurant refresh blocked for ${singleRestaurantId} – ${minutesLeft}min left`);
+            const menus = cached.map((row: any) => row.menu_data);
+            return new Response(
+              JSON.stringify({ cooldown: true, minutesLeft, menus }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+        }
         console.log(`Single restaurant refresh for ${singleRestaurantId}`);
-        // Will scrape just this one below
       } else if (force) {
+        // Window check: only allow scraping on weekdays 08–14
+        const window = isWithinFetchWindow(now);
+        if (!window.allowed) {
+          console.log(`Force refresh blocked – outside fetch window: ${window.reason}`);
+          const menus = cached.map((row: any) => row.menu_data);
+          return new Response(
+            JSON.stringify({ cooldown: true, minutesLeft: 0, reason: window.reason, menus }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
         // Check cooldown: only allow force refresh if cache is older than 30 minutes
         const COOLDOWN_MS = 30 * 60 * 1000;
         const newest = cached.reduce((a: any, b: any) =>
@@ -416,8 +469,27 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-    } else if (force) {
+    } else if (force || singleRestaurantId) {
+      // No cache yet — still enforce window for any scrape attempt
+      const window = isWithinFetchWindow(now);
+      if (!window.allowed) {
+        console.log(`Refresh blocked – outside fetch window: ${window.reason}`);
+        return new Response(
+          JSON.stringify({ cooldown: true, minutesLeft: 0, reason: window.reason, menus: [] }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
       console.log(`Force refresh – no existing cache to check cooldown against`);
+    } else {
+      // Normal request with no cache: only scrape inside the fetch window
+      const window = isWithinFetchWindow(now);
+      if (!window.allowed) {
+        console.log(`Initial scrape blocked – outside fetch window: ${window.reason}`);
+        return new Response(
+          JSON.stringify({ menus: [], reason: window.reason }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Fetch restaurants from DB

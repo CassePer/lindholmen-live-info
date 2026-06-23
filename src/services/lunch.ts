@@ -6,6 +6,7 @@ export interface LunchMenusResult {
   aiCreditsExhausted?: boolean;
   cooldown?: boolean;
   minutesLeft?: number;
+  reason?: string;
 }
 
 /**
