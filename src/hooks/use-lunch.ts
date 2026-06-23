@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getLunchMenus } from "@/services/lunch";
+import { getLunchMenus, type LunchMenusResult } from "@/services/lunch";
 import { useAppSettings } from "@/hooks/use-app-settings";
 
 function isWeekend() {
@@ -48,7 +48,7 @@ export function useLunchMenus() {
     return () => clearTimeout(timerRef.current);
   }, [refreshHour, updateWeekends, forceRefresh]);
 
-  return useQuery({
+  return useQuery<LunchMenusResult>({
     queryKey: ["lunch"],
     queryFn: () => getLunchMenus(),
     staleTime: 30 * 60 * 1000,
