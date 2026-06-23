@@ -8,6 +8,9 @@ const corsHeaders = {
 
 const AI_GATEWAY = 'https://ai.gateway.lovable.dev/v1/chat/completions';
 
+// Per-request flag: set to true when AI Gateway returns 402 (credits exhausted)
+let aiCreditsExhausted = false;
+
 function getTodayKey(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -128,6 +131,7 @@ ${markdown.slice(0, 15000)}`;
     });
     if (!res.ok) {
       console.error(`AI text extraction failed for ${name}: ${res.status}`);
+      if (res.status === 402) aiCreditsExhausted = true;
       return [];
     }
     const data = await res.json();
@@ -199,6 +203,7 @@ async function extractMenuFromScreenshot(
     });
     if (!res.ok) {
       console.error(`AI vision extraction failed for ${name}: ${res.status}`);
+      if (res.status === 402) aiCreditsExhausted = true;
       return [];
     }
     const data = await res.json();
@@ -346,6 +351,8 @@ Deno.serve(async (req) => {
     // Parse force and restaurantId parameters from body or query
     let force = false;
     let singleRestaurantId: string | null = null;
+    // Reset per-request flag
+    aiCreditsExhausted = false;
     try {
       const url = new URL(req.url);
       if (url.searchParams.get('force') === 'true') force = true;
@@ -405,7 +412,7 @@ Deno.serve(async (req) => {
         // Normal request – serve from cache
         console.log(`Serving ${cached.length} menus from cache for ${todayKey}`);
         const menus = cached.map((row: any) => row.menu_data);
-        return new Response(JSON.stringify(menus), {
+        return new Response(JSON.stringify({ menus }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -427,7 +434,7 @@ Deno.serve(async (req) => {
 
     if (restError || !restaurants?.length) {
       console.error('Failed to load restaurants:', restError);
-      return new Response(JSON.stringify([]), {
+      return new Response(JSON.stringify({ menus: [] }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -510,20 +517,27 @@ Deno.serve(async (req) => {
     }
 
     // Store in cache
-    const rows = allMenus.map((menu: any) => ({
-      week_key: todayKey,
-      restaurant_id: menu.restaurantId,
-      menu_data: menu,
-    }));
+    // Only cache menus that actually got dishes — don't overwrite good cache with empty
+    // results caused by AI failures (e.g. 402 credits exhausted).
+    const rowsToCache = allMenus
+      .filter((menu: any) => menu.dishes.length > 0)
+      .map((menu: any) => ({
+        week_key: todayKey,
+        restaurant_id: menu.restaurantId,
+        menu_data: menu,
+      }));
 
-    const { error: insertError } = await supabase
-      .from('lunch_menu_cache')
-      .upsert(rows, { onConflict: 'week_key,restaurant_id' });
-
-    if (insertError) {
-      console.error('Cache insert error:', insertError);
+    if (rowsToCache.length > 0) {
+      const { error: insertError } = await supabase
+        .from('lunch_menu_cache')
+        .upsert(rowsToCache, { onConflict: 'week_key,restaurant_id' });
+      if (insertError) {
+        console.error('Cache insert error:', insertError);
+      } else {
+        console.log(`Cached ${rowsToCache.length} menus for ${todayKey}`);
+      }
     } else {
-      console.log(`Cached ${rows.length} menus for ${todayKey}`);
+      console.log(`Skipping cache write — 0 menus had dishes (aiCreditsExhausted=${aiCreditsExhausted})`);
     }
 
     // If single restaurant refresh, merge with existing cached menus and return full list
@@ -532,16 +546,51 @@ Deno.serve(async (req) => {
       const existingMenus = cached
         .filter((row: any) => !updatedIds.has(row.menu_data.restaurantId))
         .map((row: any) => row.menu_data);
-      const merged = [...existingMenus, ...allMenus];
+      // If the refresh produced no dishes (e.g. AI 402), keep the previously cached entry
+      // for that restaurant instead of returning an empty one.
+      const refreshed = allMenus.map((m: any) => {
+        if (m.dishes.length > 0) return m;
+        const prev = cached.find((row: any) => row.menu_data.restaurantId === m.restaurantId);
+        return prev ? prev.menu_data : m;
+      });
+      const merged = [...existingMenus, ...refreshed];
       console.log(`Merged: ${allMenus.length} refreshed + ${existingMenus.length} cached = ${merged.length} total`);
-      return new Response(JSON.stringify(merged), {
+      return new Response(JSON.stringify({ menus: merged, aiCreditsExhausted }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     console.log(`Done. Got menus for ${(allMenus as any[]).filter((m: any) => m.dishes.length > 0).length}/${restaurants.length} restaurants.`);
 
-    return new Response(JSON.stringify(allMenus), {
+    // If we got 0 menus with dishes but have cached data from earlier, serve the cache.
+    let responseMenus: unknown[] = allMenus;
+    const gotAny = (allMenus as any[]).some((m: any) => m.dishes.length > 0);
+    if (!gotAny) {
+      // Try latest cached menus from any day
+      const { data: anyCache } = await supabase
+        .from('lunch_menu_cache')
+        .select('menu_data, created_at')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (anyCache && anyCache.length > 0) {
+        // Dedupe by restaurantId, keeping newest
+        const seen = new Set<string>();
+        const latest: any[] = [];
+        for (const row of anyCache) {
+          const id = (row.menu_data as any)?.restaurantId;
+          if (id && !seen.has(id)) {
+            seen.add(id);
+            latest.push(row.menu_data);
+          }
+        }
+        if (latest.length > 0) {
+          console.log(`Serving ${latest.length} stale cached menus as fallback`);
+          responseMenus = latest;
+        }
+      }
+    }
+
+    return new Response(JSON.stringify({ menus: responseMenus, aiCreditsExhausted }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {

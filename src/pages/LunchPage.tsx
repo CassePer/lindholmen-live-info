@@ -164,14 +164,12 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
     setIsRefreshing(true);
     try {
       const freshData = await getLunchMenus(true);
-      if (freshData && typeof freshData === 'object' && 'cooldown' in freshData) {
-        const cd = freshData as any;
-        toast.info(`Menyerna uppdaterades nyligen. Försök igen om ${cd.minutesLeft} min.`);
-        if (cd.menus) {
-          queryClient.setQueryData(["lunch"], cd.menus);
-        }
+      queryClient.setQueryData(["lunch"], freshData);
+      if (freshData.cooldown) {
+        toast.info(`Menyerna uppdaterades nyligen. Försök igen om ${freshData.minutesLeft} min.`);
+      } else if (freshData.aiCreditsExhausted) {
+        toast.error("Uppdatering misslyckades — AI-krediter saknas.");
       } else {
-        queryClient.setQueryData(["lunch"], freshData);
         toast.success("Menyerna har uppdaterats!");
       }
     } catch (err) {
@@ -186,12 +184,12 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
     setRefreshingId(restaurantId);
     try {
       const freshData = await getLunchMenus(true, restaurantId);
-      if (freshData && typeof freshData === 'object' && 'cooldown' in freshData) {
-        const cd = freshData as any;
-        toast.info(`Menyn uppdaterades nyligen. Försök igen om ${cd.minutesLeft} min.`);
-        if (cd.menus) queryClient.setQueryData(["lunch"], cd.menus);
+      queryClient.setQueryData(["lunch"], freshData);
+      if (freshData.cooldown) {
+        toast.info(`Menyn uppdaterades nyligen. Försök igen om ${freshData.minutesLeft} min.`);
+      } else if (freshData.aiCreditsExhausted) {
+        toast.error("Uppdatering misslyckades — AI-krediter saknas.");
       } else {
-        queryClient.setQueryData(["lunch"], freshData);
         toast.success("Menyn har uppdaterats!");
       }
     } catch (err) {
@@ -202,7 +200,9 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
     }
   };
 
-  const filtered = data?.filter((m) =>
+  const menus = data?.menus ?? [];
+  const aiCreditsExhausted = data?.aiCreditsExhausted ?? false;
+  const filtered = menus.filter((m) =>
     m.restaurantName.toLowerCase().includes(activeSearch.toLowerCase()) ||
     m.dishes.some((d) => d.name.toLowerCase().includes(activeSearch.toLowerCase()))
   );
@@ -240,6 +240,18 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {aiCreditsExhausted && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        >
+          <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+          <p>
+            Menyer kunde inte uppdateras — AI-krediter saknas. Visar senaste tillgängliga data.
+          </p>
+        </div>
+      )}
 
       {isLoading ? (
         <MenuSkeleton />

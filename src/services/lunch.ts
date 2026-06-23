@@ -1,11 +1,18 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { LunchMenu } from "@/api/types";
 
+export interface LunchMenusResult {
+  menus: LunchMenu[];
+  aiCreditsExhausted?: boolean;
+  cooldown?: boolean;
+  minutesLeft?: number;
+}
+
 /**
  * Fetch today's lunch menus via the edge function.
  * The edge function handles caching internally.
  */
-export async function getLunchMenus(force = false, restaurantId?: string): Promise<LunchMenu[]> {
+export async function getLunchMenus(force = false, restaurantId?: string): Promise<LunchMenusResult> {
   const body: Record<string, unknown> = {};
   if (force) body.force = true;
   if (restaurantId) body.restaurantId = restaurantId;
@@ -24,5 +31,10 @@ export async function getLunchMenus(force = false, restaurantId?: string): Promi
     throw new Error(data.error.message || "Kunde inte hämta lunchmenyer.");
   }
 
-  return data as LunchMenu[];
+  // New shape: { menus, aiCreditsExhausted?, cooldown?, minutesLeft? }
+  // Back-compat: if server still returns a bare array, wrap it.
+  if (Array.isArray(data)) {
+    return { menus: data as LunchMenu[] };
+  }
+  return data as LunchMenusResult;
 }
