@@ -241,6 +241,18 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
         )}
       </AnimatePresence>
 
+      {aiCreditsExhausted && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        >
+          <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+          <p>
+            Menyer kunde inte uppdateras — AI-krediter saknas. Visar senaste tillgängliga data.
+          </p>
+        </div>
+      )}
+
       {isLoading ? (
         <MenuSkeleton />
       ) : error ? (
