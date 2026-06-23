@@ -8,6 +8,9 @@ const corsHeaders = {
 
 const AI_GATEWAY = 'https://ai.gateway.lovable.dev/v1/chat/completions';
 
+// Per-request flag: set to true when AI Gateway returns 402 (credits exhausted)
+let aiCreditsExhausted = false;
+
 function getTodayKey(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -128,6 +131,7 @@ ${markdown.slice(0, 15000)}`;
     });
     if (!res.ok) {
       console.error(`AI text extraction failed for ${name}: ${res.status}`);
+      if (res.status === 402) aiCreditsExhausted = true;
       return [];
     }
     const data = await res.json();
@@ -199,6 +203,7 @@ async function extractMenuFromScreenshot(
     });
     if (!res.ok) {
       console.error(`AI vision extraction failed for ${name}: ${res.status}`);
+      if (res.status === 402) aiCreditsExhausted = true;
       return [];
     }
     const data = await res.json();
