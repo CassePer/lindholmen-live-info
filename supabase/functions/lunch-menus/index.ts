@@ -18,6 +18,25 @@ function getTodayKey(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+/** Check if current time (Europe/Stockholm) is within allowed fetch window:
+ *  weekdays (Mon-Fri), hours 08:00-13:59. */
+function isWithinFetchWindow(date: Date): { allowed: boolean; reason?: string } {
+  const parts = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Europe/Stockholm',
+    weekday: 'short',
+    hour: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+  const weekday = parts.find((p) => p.type === 'weekday')?.value ?? '';
+  const hourStr = parts.find((p) => p.type === 'hour')?.value ?? '0';
+  const hour = parseInt(hourStr, 10);
+  // sv-SE short weekday: mån, tis, ons, tors, fre, lör, sön
+  const isWeekday = ['mån', 'tis', 'ons', 'tors', 'fre'].includes(weekday);
+  if (!isWeekday) return { allowed: false, reason: 'Hämtning av menyer är endast tillåten på vardagar (mån–fre).' };
+  if (hour < 8 || hour >= 14) return { allowed: false, reason: 'Hämtning av menyer är endast tillåten kl 08–14.' };
+  return { allowed: true };
+}
+
 interface ScrapeResult {
   markdown: string | null;
   screenshot: string | null;
