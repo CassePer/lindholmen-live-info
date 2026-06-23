@@ -166,7 +166,7 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
       const freshData = await getLunchMenus(true);
       queryClient.setQueryData(["lunch"], freshData);
       if (freshData.cooldown) {
-        toast.info(`Menyerna uppdaterades nyligen. Försök igen om ${freshData.minutesLeft} min.`);
+        toast.info(freshData.reason ?? `Menyerna uppdaterades nyligen. Försök igen om ${freshData.minutesLeft} min.`);
       } else if (freshData.aiCreditsExhausted) {
         toast.error("Uppdatering misslyckades — AI-krediter saknas.");
       } else {
@@ -186,7 +186,7 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
       const freshData = await getLunchMenus(true, restaurantId);
       queryClient.setQueryData(["lunch"], freshData);
       if (freshData.cooldown) {
-        toast.info(`Menyn uppdaterades nyligen. Försök igen om ${freshData.minutesLeft} min.`);
+        toast.info(freshData.reason ?? `Menyn uppdaterades nyligen. Försök igen om ${freshData.minutesLeft} min.`);
       } else if (freshData.aiCreditsExhausted) {
         toast.error("Uppdatering misslyckades — AI-krediter saknas.");
       } else {
