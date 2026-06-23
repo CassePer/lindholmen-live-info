@@ -351,6 +351,8 @@ Deno.serve(async (req) => {
     // Parse force and restaurantId parameters from body or query
     let force = false;
     let singleRestaurantId: string | null = null;
+    // Reset per-request flag
+    aiCreditsExhausted = false;
     try {
       const url = new URL(req.url);
       if (url.searchParams.get('force') === 'true') force = true;
