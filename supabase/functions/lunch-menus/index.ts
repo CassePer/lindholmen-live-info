@@ -412,7 +412,7 @@ Deno.serve(async (req) => {
         // Normal request – serve from cache
         console.log(`Serving ${cached.length} menus from cache for ${todayKey}`);
         const menus = cached.map((row: any) => row.menu_data);
-        return new Response(JSON.stringify(menus), {
+        return new Response(JSON.stringify({ menus }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
