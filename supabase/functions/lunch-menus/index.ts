@@ -480,6 +480,16 @@ Deno.serve(async (req) => {
         );
       }
       console.log(`Force refresh – no existing cache to check cooldown against`);
+    } else {
+      // Normal request with no cache: only scrape inside the fetch window
+      const window = isWithinFetchWindow(now);
+      if (!window.allowed) {
+        console.log(`Initial scrape blocked – outside fetch window: ${window.reason}`);
+        return new Response(
+          JSON.stringify({ menus: [], reason: window.reason }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Fetch restaurants from DB
