@@ -600,7 +600,7 @@ Deno.serve(async (req) => {
           if (dishes.length === 0) {
             const prev = latestByRestaurant.get(r.id);
             if (prev) {
-              return prev;
+              return { ...prev, _substituted: true };
             }
           }
           return {
@@ -620,8 +620,8 @@ Deno.serve(async (req) => {
     // Store in cache
     // Only cache menus that actually got dishes — don't overwrite good cache with empty
     // results caused by AI failures (e.g. 402 credits exhausted).
-    const rowsToCache = allMenus
-      .filter((menu: any) => menu.dishes.length > 0)
+    const rowsToCache = (allMenus as any[])
+      .filter((menu: any) => menu.dishes.length > 0 && !menu._substituted && menu.date === todayKey)
       .map((menu: any) => ({
         week_key: todayKey,
         restaurant_id: menu.restaurantId,
@@ -643,7 +643,10 @@ Deno.serve(async (req) => {
 
     // Helper: stamp `stale` if the menu's date doesn't match today.
     const withStale = (list: any[]) =>
-      list.map((m: any) => ({ ...m, stale: m?.date !== todayKey }));
+      list.map((m: any) => {
+        const { _substituted, ...rest } = m ?? {};
+        return { ...rest, stale: rest?.date !== todayKey };
+      });
 
     // If single restaurant refresh, merge with existing cached menus and return full list
     if (singleRestaurantId && cached && cached.length > 0) {
