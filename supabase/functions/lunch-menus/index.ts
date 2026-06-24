@@ -513,6 +513,26 @@ Deno.serve(async (req) => {
 
     console.log(`Scraping ${restaurants.length} restaurant(s)...`);
 
+    // Pre-load the latest cached menu_data per restaurant across ALL days.
+    // Used as fallback when a fresh scrape yields no dishes — we keep the
+    // previous day's data (with its original updatedAt) and mark it stale.
+    const latestByRestaurant = new Map<string, any>();
+    {
+      const { data: allCache } = await supabase
+        .from('lunch_menu_cache')
+        .select('menu_data, created_at')
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (allCache) {
+        for (const row of allCache as any[]) {
+          const id = row.menu_data?.restaurantId;
+          if (id && !latestByRestaurant.has(id)) {
+            latestByRestaurant.set(id, row.menu_data);
+          }
+        }
+      }
+    }
+
     const BATCH_SIZE = 4;
     const allMenus: unknown[] = [];
 
@@ -574,6 +594,15 @@ Deno.serve(async (req) => {
             }
           }
 
+          // If the scrape produced no dishes, keep the last known menu for this
+          // restaurant (don't bump updatedAt). The response layer will mark it
+          // as stale if its date != today.
+          if (dishes.length === 0) {
+            const prev = latestByRestaurant.get(r.id);
+            if (prev) {
+              return prev;
+            }
+          }
           return {
             restaurantId: r.id,
             restaurantName: r.name,
@@ -612,57 +641,26 @@ Deno.serve(async (req) => {
       console.log(`Skipping cache write — 0 menus had dishes (aiCreditsExhausted=${aiCreditsExhausted})`);
     }
 
+    // Helper: stamp `stale` if the menu's date doesn't match today.
+    const withStale = (list: any[]) =>
+      list.map((m: any) => ({ ...m, stale: m?.date !== todayKey }));
+
     // If single restaurant refresh, merge with existing cached menus and return full list
     if (singleRestaurantId && cached && cached.length > 0) {
       const updatedIds = new Set(allMenus.map((m: any) => m.restaurantId));
       const existingMenus = cached
         .filter((row: any) => !updatedIds.has(row.menu_data.restaurantId))
         .map((row: any) => row.menu_data);
-      // If the refresh produced no dishes (e.g. AI 402), keep the previously cached entry
-      // for that restaurant instead of returning an empty one.
-      const refreshed = allMenus.map((m: any) => {
-        if (m.dishes.length > 0) return m;
-        const prev = cached.find((row: any) => row.menu_data.restaurantId === m.restaurantId);
-        return prev ? prev.menu_data : m;
-      });
-      const merged = [...existingMenus, ...refreshed];
+      const merged = [...existingMenus, ...allMenus];
       console.log(`Merged: ${allMenus.length} refreshed + ${existingMenus.length} cached = ${merged.length} total`);
-      return new Response(JSON.stringify({ menus: merged, aiCreditsExhausted }), {
+      return new Response(JSON.stringify({ menus: withStale(merged), aiCreditsExhausted }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     console.log(`Done. Got menus for ${(allMenus as any[]).filter((m: any) => m.dishes.length > 0).length}/${restaurants.length} restaurants.`);
 
-    // If we got 0 menus with dishes but have cached data from earlier, serve the cache.
-    let responseMenus: unknown[] = allMenus;
-    const gotAny = (allMenus as any[]).some((m: any) => m.dishes.length > 0);
-    if (!gotAny) {
-      // Try latest cached menus from any day
-      const { data: anyCache } = await supabase
-        .from('lunch_menu_cache')
-        .select('menu_data, created_at')
-        .order('created_at', { ascending: false })
-        .limit(50);
-      if (anyCache && anyCache.length > 0) {
-        // Dedupe by restaurantId, keeping newest
-        const seen = new Set<string>();
-        const latest: any[] = [];
-        for (const row of anyCache) {
-          const id = (row.menu_data as any)?.restaurantId;
-          if (id && !seen.has(id)) {
-            seen.add(id);
-            latest.push(row.menu_data);
-          }
-        }
-        if (latest.length > 0) {
-          console.log(`Serving ${latest.length} stale cached menus as fallback`);
-          responseMenus = latest;
-        }
-      }
-    }
-
-    return new Response(JSON.stringify({ menus: responseMenus, aiCreditsExhausted }), {
+    return new Response(JSON.stringify({ menus: withStale(allMenus as any[]), aiCreditsExhausted }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
