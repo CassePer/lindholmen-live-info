@@ -1,39 +1,11 @@
-## Diagnos
+## Problem
 
-Edge function-loggarna för `lunch-menus` visar:
+Vid uppdatering av en enskild restaurang slår edge-funktionen `lunch-menus` ihop den uppdaterade restaurangen med övriga via `[...existingMenus, ...allMenus]` — den uppdaterade hamnar därför sist i svaret, istället för på sin alfabetiska plats.
 
-```
-AI text extraction failed for ...: 402
-AI vision extraction failed for ...: 402
-Done. Got menus for 0/6 restaurants.
-```
+## Åtgärd
 
-**402 = Payment Required** från Lovable AI Gateway → arbetsytans AI-krediter är slut. Skraparen får tom data och cachear 0 menyer.
+**`supabase/functions/lunch-menus/index.ts`**
+- I single-restaurant-grenen, sortera den sammanslagna listan på `restaurantName` (sv-locale) före retur.
+- Som extra säkerhet: sortera även huvudgrenens svar och cache-serverade svar på `restaurantName`, så ordningen alltid är alfabetisk oavsett källa.
 
-## Åtgärd (utanför koden)
-
-Fyll på krediter: **workspace-namnet (uppe till vänster) → Settings → Plans & credits**. Så snart krediter finns fungerar nästa körning av `lunch-menus` igen — ingen kodändring behövs för själva orsaken.
-
-## Kodändring jag föreslår ändå
-
-För att appen ska hantera detta tydligt i framtiden:
-
-### 1. `supabase/functions/lunch-menus/index.ts`
-- Räkna 402-svar från AI-anropen. Om alla restauranger misslyckas med 402, returnera ett extra fält i svaret:
-  ```json
-  { "menus": [...senast cachade...], "aiCreditsExhausted": true }
-  ```
-- Servera senaste cachade menyer från DB även om de är från en tidigare dag (istället för tom lista).
-
-### 2. `src/services/lunch.ts`
-- Vidarebefordra `aiCreditsExhausted`-flaggan tillsammans med menyerna.
-
-### 3. `src/pages/LunchPage.tsx`
-- Om `aiCreditsExhausted` är true: visa en diskret varningsbanner överst:  
-  *"Menyer kunde inte uppdateras — AI-krediter saknas. Visar senaste tillgängliga data."*
-- Toast vid manuell refresh-knapp: *"Uppdatering misslyckades — AI-krediter saknas."*
-
-### Filer som ändras
-- `supabase/functions/lunch-menus/index.ts`
-- `src/services/lunch.ts`
-- `src/pages/LunchPage.tsx`
+Ingen ändring i frontend behövs.
