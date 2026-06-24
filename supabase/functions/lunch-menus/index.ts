@@ -402,6 +402,11 @@ Deno.serve(async (req) => {
     const now = new Date();
     const todayKey = getTodayKey(now);
 
+    const sortByName = (list: any[]) =>
+      [...list].sort((a, b) =>
+        String(a?.restaurantName ?? '').localeCompare(String(b?.restaurantName ?? ''), 'sv')
+      );
+
     // Check cache for today
     const { data: cached, error: cacheError } = await supabase
       .from('lunch_menu_cache')
@@ -468,7 +473,7 @@ Deno.serve(async (req) => {
       } else {
         // Normal request – serve from cache
         console.log(`Serving ${cached.length} menus from cache for ${todayKey}`);
-        const menus = cached.map((row: any) => row.menu_data);
+        const menus = sortByName(cached.map((row: any) => row.menu_data));
         return new Response(JSON.stringify({ menus }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -669,14 +674,14 @@ Deno.serve(async (req) => {
         .map((row: any) => row.menu_data);
       const merged = [...existingMenus, ...allMenus];
       console.log(`Merged: ${allMenus.length} refreshed + ${existingMenus.length} cached = ${merged.length} total`);
-      return new Response(JSON.stringify({ menus: withStale(merged), aiCreditsExhausted }), {
+      return new Response(JSON.stringify({ menus: sortByName(withStale(merged)), aiCreditsExhausted }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     console.log(`Done. Got menus for ${(allMenus as any[]).filter((m: any) => m.dishes.length > 0).length}/${restaurants.length} restaurants.`);
 
-    return new Response(JSON.stringify({ menus: withStale(allMenus as any[]), aiCreditsExhausted }), {
+    return new Response(JSON.stringify({ menus: sortByName(withStale(allMenus as any[])), aiCreditsExhausted }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
