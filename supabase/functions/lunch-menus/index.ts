@@ -420,7 +420,7 @@ Deno.serve(async (req) => {
         const window = isWithinFetchWindow(now);
         if (!window.allowed) {
           console.log(`Single refresh blocked – outside fetch window: ${window.reason}`);
-          const menus = cached.map((row: any) => row.menu_data);
+          const menus = sortByName(cached.map((row: any) => row.menu_data));
           return new Response(
             JSON.stringify({ cooldown: true, minutesLeft: 0, reason: window.reason, menus }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -434,7 +434,7 @@ Deno.serve(async (req) => {
           if (ageMs < PER_REST_COOLDOWN_MS) {
             const minutesLeft = Math.ceil((PER_REST_COOLDOWN_MS - ageMs) / 60000);
             console.log(`Per-restaurant refresh blocked for ${singleRestaurantId} – ${minutesLeft}min left`);
-            const menus = cached.map((row: any) => row.menu_data);
+            const menus = sortByName(cached.map((row: any) => row.menu_data));
             return new Response(
               JSON.stringify({ cooldown: true, minutesLeft, menus }),
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -447,7 +447,7 @@ Deno.serve(async (req) => {
         const window = isWithinFetchWindow(now);
         if (!window.allowed) {
           console.log(`Force refresh blocked – outside fetch window: ${window.reason}`);
-          const menus = cached.map((row: any) => row.menu_data);
+          const menus = sortByName(cached.map((row: any) => row.menu_data));
           return new Response(
             JSON.stringify({ cooldown: true, minutesLeft: 0, reason: window.reason, menus }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -462,7 +462,7 @@ Deno.serve(async (req) => {
         if (ageMs < COOLDOWN_MS) {
           const minutesLeft = Math.ceil((COOLDOWN_MS - ageMs) / 60000);
           console.log(`Force refresh blocked – cache is ${Math.floor(ageMs / 60000)}min old, cooldown ${minutesLeft}min left`);
-          const menus = cached.map((row: any) => row.menu_data);
+          const menus = sortByName(cached.map((row: any) => row.menu_data));
           return new Response(JSON.stringify({ cooldown: true, minutesLeft, menus }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
