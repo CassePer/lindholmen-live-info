@@ -85,23 +85,27 @@ IDAG ÄR: ${todayDay} (förkortat: ${todayAbbrev})
 
 REGLER – läs ALLA innan du börjar:
 
-1. VECKANS RÄTTER: Inkludera rätter markerade som "Veckans", "Hela veckan", "Alltid på menyn", eller rätter utan dagsangivelse som uppenbart gäller hela veckan. Dessa serveras VARJE dag.
+1. VECKOMENY MED DAGAR (vanligast): Om menyn har en sektion per veckodag (t.ex. rubriker "Måndag", "Tisdag", … "Fredag" eller "MÅN", "TIS"…) → extrahera ENDAST rätterna under sektionen för ${todayDay}/${todayAbbrev}. ALLA andra dagars rätter ska IGNORERAS, även om de står först på sidan eller ser ut som "huvudrätter".
 
-2. DAGSPECIFIKA RÄTTER: Inkludera rätter som explicit tillhör "${todayDay}" (t.ex. "${todayDay}: Pasta bolognese", eller under rubriken "${todayDay}").
+   Var EXTRA noga: hitta exakt rubriken som matchar "${todayDay}" eller "${todayAbbrev}" (skiftlägesokänsligt). Allt mellan den rubriken och NÄSTA dags rubrik tillhör idag. Inget annat.
 
-3. DAGSINTERVALL: Inkludera rätter med ett dagsintervall som INKLUDERAR ${todayDay}. Exempel:
+2. VECKANS RÄTTER (endast om EXPLICIT markerat): Inkludera rätter som STÅR under rubrik "Veckans", "Hela veckan", "Alltid på menyn", eller på annat sätt explicit anges gälla hela veckan. Använd INTE denna regel som default — om det finns dagsrubriker, hör rätten till sin dag, inte hela veckan.
+
+3. DAGSPECIFIKA RÄTTER: Inkludera rätter som explicit tillhör "${todayDay}" (t.ex. "${todayDay}: Pasta bolognese", eller under rubriken "${todayDay}").
+
+4. DAGSINTERVALL: Inkludera rätter med ett dagsintervall som INKLUDERAR ${todayDay}. Exempel:
    - "Mån–Tis" inkluderar måndag och tisdag
    - "Ons–Tors" inkluderar onsdag och torsdag
    - "Mån–Ons" inkluderar måndag, tisdag, onsdag
    Kontrollera att ${todayDay} faktiskt ingår i intervallet.
 
-4. CAESARSALLAD / STÅENDE RÄTTER: Om en rätt står utanför dagstrukturen (t.ex. efter veckans rätter men före dagarna) och inte har en dagsangivelse, räkna den som en veckans rätt.
+5. CAESARSALLAD / STÅENDE RÄTTER: Om en rätt står utanför dagstrukturen (t.ex. efter veckans rätter men före dagarna) och inte har en dagsangivelse, räkna den som en veckans rätt.
 
-5. UTESLUT rätter som tillhör ANDRA specifika veckodagar. Om det står "Tisdag: Fisk" och idag INTE är tisdag → hoppa över.
+6. UTESLUT rätter som tillhör ANDRA specifika veckodagar. Om det står "Tisdag: Fisk" och idag INTE är tisdag → hoppa över. Detta är den viktigaste regeln — fel dag = fel meny.
 
-6. Inkludera ALLA rätter som står på menyn, oavsett typ. Soppor, pannkakor, efterrätter och andra tillbehör ska också tas med. Inkludera rättens namn OCH beskrivning/tillbehör som en sammanhängande text. Ignorera priser.
+7. Inkludera ALLA rätter (som hör till idag enligt reglerna ovan) oavsett typ — soppor, pannkakor, efterrätter, tillbehör. Inkludera rättens namn OCH beskrivning/tillbehör som en sammanhängande text. Ignorera priser.
 
-7. DAGSINFORMATION I NAMN: Skriv ut vilka dagar rätten gäller som prefix i namnet:
+8. DAGSINFORMATION I NAMN: Skriv ut vilka dagar rätten gäller som prefix i namnet:
    - Veckans rätter: "(Hela veckan) Rättnamn – tillbehör"
    - Dagsintervall: "(Mån–Tis) Rättnamn – tillbehör"
    - Enbart dagens rätt: Inget prefix behövs, det är underförstått att den gäller idag.
@@ -533,6 +537,15 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Only substitute from "yesterday or today" — never older. The user
+    // explicitly does not want stale messages pointing to data from days ago.
+    function yesterdayKey(d: Date): string {
+      const y = new Date(d);
+      y.setDate(y.getDate() - 1);
+      return getTodayKey(y);
+    }
+    const allowedPrevDates = new Set<string>([todayKey, yesterdayKey(now)]);
+
     const BATCH_SIZE = 4;
     const allMenus: unknown[] = [];
 
@@ -599,7 +612,7 @@ Deno.serve(async (req) => {
           // as stale if its date != today.
           if (dishes.length === 0) {
             const prev = latestByRestaurant.get(r.id);
-            if (prev) {
+            if (prev && allowedPrevDates.has(prev.date)) {
               return { ...prev, _substituted: true };
             }
           }
