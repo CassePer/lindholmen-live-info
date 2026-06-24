@@ -33,6 +33,8 @@ export interface LunchMenu {
   dishes: LunchDish[];
   sourceUrl: string;
   updatedAt: string; // ISO 8601
+  /** True if the menu does not represent today's data (e.g. fetched on an earlier day). */
+  stale?: boolean;
 }
 
 export interface WeeklyLunchMenu {

@@ -233,6 +233,11 @@ function RestaurantCard({ menu, search, onRefresh, isRefreshing }: { menu: Lunch
         <p className="text-xs text-muted-foreground pt-2">
           Uppdaterad: {formatDate(menu.updatedAt)} kl {formatTime(menu.updatedAt)}
         </p>
+        {menu.stale && (
+          <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+            Ej dagens meny – visar senast hämtade ({formatDate(menu.updatedAt)})
+          </p>
+        )}
         {!refreshState.allowed && refreshState.nextLabel && (
           <p className="text-xs text-muted-foreground/80 italic">{refreshState.nextLabel}</p>
         )}
