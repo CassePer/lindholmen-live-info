@@ -105,10 +105,12 @@ REGLER – läs ALLA innan du börjar:
 
 7. Inkludera ALLA rätter (som hör till idag enligt reglerna ovan) oavsett typ — soppor, pannkakor, efterrätter, tillbehör. Inkludera rättens namn OCH beskrivning/tillbehör som en sammanhängande text. Ignorera priser.
 
-8. DAGSINFORMATION I NAMN: Skriv ut vilka dagar rätten gäller som prefix i namnet:
-   - Veckans rätter: "(Hela veckan) Rättnamn – tillbehör"
-   - Dagsintervall: "(Mån–Tis) Rättnamn – tillbehör"
-   - Enbart dagens rätt: Inget prefix behövs, det är underförstått att den gäller idag.
+8. DAGSINFORMATION I NAMN (OBLIGATORISKT när rätten gäller fler dagar än bara idag):
+   - Veckans rätter / "Alltid på menyn": prefix "(Hela veckan) " — t.ex. "(Hela veckan) Caesarsallad – kyckling"
+   - Dagsintervall som inkluderar idag: prefix med exakt det intervall som står på menyn, t.ex. "(Ons–Tors) Fiskgryta – ris", "(Mån–Tis) Pasta – tomatsås"
+   - Rätter som tydligt gäller flera enskilda dagar (t.ex. "Mån & Ons"): prefix "(Mån & Ons) ..."
+   - Endast dagens rätt (gäller bara ${todayDay}): INGET prefix.
+   Ta ALDRIG bort denna parentes om den hör till rätten — den är viktig information för användaren.
 
 Svara ENBART med giltig JSON (inga kommentarer, ingen markdown):
 {"dishes":[{"name":"(Hela veckan) Rättens namn – beskrivning/tillbehör","tags":["vegetarisk"]}]}
