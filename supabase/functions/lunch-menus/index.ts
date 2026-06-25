@@ -587,12 +587,22 @@ Deno.serve(async (req) => {
     }
 
     // Check cache for today
-    const { data: cached, error: cacheError } = await supabase
+    const { data: cacheRowsAll, error: cacheError } = await supabase
       .from('lunch_menu_cache')
-      .select('menu_data, created_at')
-      .eq('week_key', todayKey);
+      .select('menu_data, created_at, week_key')
+      .in('week_key', cacheKeys);
 
-    if (!cacheError && cached && cached.length > 0) {
+    // Keep: today's daily rows + this week's weekly rows
+    const cached = (cacheRowsAll ?? []).filter((row: any) => {
+      if (row.menu_data?.weekly) return row.menu_data?.weekStart === mondayKey;
+      return row.week_key === todayKey;
+    });
+    // Whether we have any daily cache for today — drives "serve from cache" decision
+    const hasTodayDaily = (cacheRowsAll ?? []).some(
+      (row: any) => row.week_key === todayKey && !row.menu_data?.weekly
+    );
+
+    if (!cacheError && hasTodayDaily && cached.length > 0) {
       // Single restaurant refresh — bypass cooldown, re-scrape only one
       if (singleRestaurantId) {
         // Window check: only allow scraping on weekdays 08–14
