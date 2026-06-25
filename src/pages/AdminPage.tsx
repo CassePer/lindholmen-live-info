@@ -146,15 +146,17 @@ function EditableRestaurantRow({
   const [name, setName] = useState(restaurant.name);
   const [menuUrl, setMenuUrl] = useState(restaurant.menu_url);
   const [websiteUrl, setWebsiteUrl] = useState(restaurant.website_url);
+  const [weeklyMenu, setWeeklyMenu] = useState(!!restaurant.weekly_menu);
 
   const handleSave = () => {
-    onUpdate(restaurant.id, { name, menu_url: menuUrl, website_url: websiteUrl });
+    onUpdate(restaurant.id, { name, menu_url: menuUrl, website_url: websiteUrl, weekly_menu: weeklyMenu });
     setEditing(false);
   };
   const handleCancel = () => {
     setName(restaurant.name);
     setMenuUrl(restaurant.menu_url);
     setWebsiteUrl(restaurant.website_url);
+    setWeeklyMenu(!!restaurant.weekly_menu);
     setEditing(false);
   };
 
@@ -165,6 +167,14 @@ function EditableRestaurantRow({
           <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Namn" />
           <Input value={menuUrl} onChange={(e) => setMenuUrl(e.target.value)} placeholder="Meny-URL" type="url" />
           <Input value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} placeholder="Webbplats-URL" type="url" />
+          <label className="flex items-center gap-2 text-sm pt-1 select-none cursor-pointer">
+            <Checkbox
+              id={`weekly-${restaurant.id}`}
+              checked={weeklyMenu}
+              onCheckedChange={(v) => setWeeklyMenu(!!v)}
+            />
+            <span>Veckomeny (publiceras hela veckan på måndag — skrapas 1 gång/vecka)</span>
+          </label>
           <div className="flex gap-2 justify-end">
             <Button variant="ghost" size="sm" onClick={handleCancel}><X className="h-4 w-4 mr-1" /> Avbryt</Button>
             <Button size="sm" onClick={handleSave} disabled={!name.trim() || !menuUrl.trim()}><Check className="h-4 w-4 mr-1" /> Spara</Button>
@@ -178,7 +188,12 @@ function EditableRestaurantRow({
     <Card className="glass-card">
       <CardContent className="flex items-center justify-between py-3 px-4">
         <div className="min-w-0 flex-1">
-          <p className="font-medium truncate">{restaurant.name}</p>
+          <p className="font-medium truncate">
+            {restaurant.name}
+            {restaurant.weekly_menu && (
+              <span className="ml-2 text-[10px] uppercase tracking-wide text-primary/80 font-semibold">Veckomeny</span>
+            )}
+          </p>
           <a href={restaurant.menu_url} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 truncate">
             <ExternalLink className="h-3 w-3 flex-shrink-0" />{restaurant.menu_url}
           </a>
