@@ -891,12 +891,26 @@ Deno.serve(async (req) => {
     // Only cache menus that actually got dishes — don't overwrite good cache with empty
     // results caused by AI failures (e.g. 402 credits exhausted).
     const rowsToCache = (allMenus as any[])
-      .filter((menu: any) => menu.dishes.length > 0 && !menu._substituted && menu.date === todayKey)
-      .map((menu: any) => ({
-        week_key: todayKey,
-        restaurant_id: menu.restaurantId,
-        menu_data: menu,
-      }));
+      .filter((menu: any) => !menu._substituted)
+      .map((menu: any) => {
+        // Weekly menu → store the RAW per-day structure under the Monday week_key
+        if (menu._weeklyRaw) {
+          return {
+            week_key: mondayKey,
+            restaurant_id: menu.restaurantId,
+            menu_data: menu._weeklyRaw,
+          };
+        }
+        if (menu.dishes.length > 0 && menu.date === todayKey) {
+          return {
+            week_key: todayKey,
+            restaurant_id: menu.restaurantId,
+            menu_data: menu,
+          };
+        }
+        return null;
+      })
+      .filter((row: any) => row !== null);
 
     if (rowsToCache.length > 0) {
       const { error: insertError } = await supabase
@@ -905,7 +919,7 @@ Deno.serve(async (req) => {
       if (insertError) {
         console.error('Cache insert error:', insertError);
       } else {
-        console.log(`Cached ${rowsToCache.length} menus for ${todayKey}`);
+        console.log(`Cached ${rowsToCache.length} menus (today=${todayKey}, weekStart=${mondayKey})`);
       }
     } else {
       console.log(`Skipping cache write — 0 menus had dishes (aiCreditsExhausted=${aiCreditsExhausted})`);
@@ -914,7 +928,7 @@ Deno.serve(async (req) => {
     // Helper: stamp `stale` if the menu's date doesn't match today.
     const withStale = (list: any[]) =>
       list.map((m: any) => {
-        const { _substituted, ...rest } = m ?? {};
+        const { _substituted, _weeklyRaw, ...rest } = m ?? {};
         return { ...rest, stale: rest?.date !== todayKey };
       });
 
@@ -922,8 +936,8 @@ Deno.serve(async (req) => {
     if (singleRestaurantId && cached && cached.length > 0) {
       const updatedIds = new Set(allMenus.map((m: any) => m.restaurantId));
       const existingMenus = cached
-        .filter((row: any) => !updatedIds.has(row.menu_data.restaurantId))
-        .map((row: any) => row.menu_data);
+        .filter((row: any) => !updatedIds.has(row.menu_data?.restaurantId))
+        .map((row: any) => normalizeMenuData(row.menu_data));
       const merged = [...existingMenus, ...allMenus];
       console.log(`Merged: ${allMenus.length} refreshed + ${existingMenus.length} cached = ${merged.length} total`);
       return new Response(JSON.stringify({ menus: sortByName(withStale(merged)), aiCreditsExhausted }), {
