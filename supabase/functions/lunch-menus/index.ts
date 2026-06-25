@@ -742,6 +742,22 @@ Deno.serve(async (req) => {
     }
     const allowedPrevDates = new Set<string>([todayKey, yesterdayKey(now)]);
 
+    // Pre-load existing weekly cache for this Monday so we can SKIP re-scraping
+    // weekly_menu restaurants that already have a fresh weekly menu cached.
+    const weeklyCacheByRestaurant = new Map<string, WeeklyMenuRaw>();
+    {
+      const { data: weeklyRows } = await supabase
+        .from('lunch_menu_cache')
+        .select('menu_data')
+        .eq('week_key', mondayKey);
+      for (const row of (weeklyRows ?? []) as any[]) {
+        const md = row.menu_data;
+        if (md?.weekly && md?.weekStart === mondayKey && md?.restaurantId) {
+          weeklyCacheByRestaurant.set(md.restaurantId, md as WeeklyMenuRaw);
+        }
+      }
+    }
+
     const BATCH_SIZE = 4;
     const allMenus: unknown[] = [];
 
@@ -749,6 +765,51 @@ Deno.serve(async (req) => {
       const batch = restaurants.slice(i, i + BATCH_SIZE);
       const results = await Promise.all(
         batch.map(async (r: any) => {
+          // ── Weekly-menu restaurants: scrape at most ONCE per ISO week ──
+          if (r.weekly_menu) {
+            const cachedWeekly = weeklyCacheByRestaurant.get(r.id);
+            const forceThis = singleRestaurantId === r.id || (force && !singleRestaurantId);
+            if (cachedWeekly && !forceThis) {
+              // Reuse this week's cached weekly menu — no scrape, no cache write.
+              return { ...weeklyToTodayMenu(cachedWeekly, now, todayKey), _substituted: true };
+            }
+            // Scrape full page and extract structured per-day menu
+            const { markdown } = await scrapeUrl(r.menu_url, firecrawlKey);
+            let byDay: Record<string, { name: string; tags?: string[] }[]> | null = null;
+            if (markdown && markdown.length >= MIN_MARKDOWN_LENGTH) {
+              byDay = await extractWeeklyMenuFromText(r.name, markdown, lovableKey);
+            }
+            if (!byDay || !weeklyHasAnyDishes(byDay)) {
+              // Fallback: keep previously known menu (today's view) for this restaurant
+              const prev = latestByRestaurant.get(r.id);
+              if (prev && (prev.weekly ? prev.weekStart === mondayKey : allowedPrevDates.has(prev.date))) {
+                return { ...prev, _substituted: true };
+              }
+              // Stub so it still appears with a heading
+              return {
+                restaurantId: r.id,
+                restaurantName: r.name,
+                websiteUrl: r.website_url,
+                sourceUrl: r.menu_url,
+                date: todayKey,
+                dishes: [],
+                updatedAt: '',
+              };
+            }
+            const rawWeekly: WeeklyMenuRaw = {
+              restaurantId: r.id,
+              restaurantName: r.name,
+              websiteUrl: r.website_url,
+              sourceUrl: r.menu_url,
+              weekly: true,
+              weekStart: mondayKey,
+              dishesByDay: byDay,
+              updatedAt: now.toISOString(),
+            };
+            const todayMenu = weeklyToTodayMenu(rawWeekly, now, todayKey);
+            return { ...todayMenu, _weeklyRaw: rawWeekly };
+          }
+
           let dishes: { name: string; tags?: string[] }[] = [];
 
           // Try Compass Group cascade: daily RSS → JSON → weekly RSS
