@@ -520,6 +520,12 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const now = new Date();
     const todayKey = getTodayKey(now);
+    const mondayKey = mondayKeyOf(now);
+    const cacheKeys = Array.from(new Set([todayKey, mondayKey]));
+
+    // Normalize a cache row's menu_data: weekly rows are projected to today's view.
+    const normalizeMenuData = (md: any) =>
+      md?.weekly ? weeklyToTodayMenu(md as WeeklyMenuRaw, now, todayKey) : md;
 
     const sortByName = (list: any[]) =>
       [...list].sort((a, b) =>
