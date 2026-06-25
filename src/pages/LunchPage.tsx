@@ -230,9 +230,11 @@ function RestaurantCard({ menu, search, onRefresh, isRefreshing }: { menu: Lunch
         ) : (
           <p className="text-sm text-muted-foreground italic">Ingen meny hittades</p>
         )}
-        <p className="text-xs text-muted-foreground pt-2">
-          Uppdaterad: {formatDate(menu.updatedAt)} kl {formatTime(menu.updatedAt)}
-        </p>
+        {menu.updatedAt && (
+          <p className="text-xs text-muted-foreground pt-2">
+            Uppdaterad: {formatDate(menu.updatedAt)} kl {formatTime(menu.updatedAt)}
+          </p>
+        )}
         {menu.stale && (
           <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
             Ej dagens meny – visar senast hämtade ({formatDate(menu.updatedAt)})
