@@ -18,6 +18,55 @@ function getTodayKey(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+/** Date key (YYYY-MM-DD) for the Monday of the given date's ISO week. */
+function mondayKeyOf(date: Date): string {
+  const d = new Date(date);
+  const day = d.getDay(); // 0=Sun, 1=Mon, ... 6=Sat
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return getTodayKey(d);
+}
+
+const DAY_KEYS_BY_INDEX = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
+type DayKey = typeof DAY_KEYS_BY_INDEX[number];
+function todayDayKey(date: Date): DayKey {
+  return DAY_KEYS_BY_INDEX[date.getDay()];
+}
+
+interface WeeklyMenuRaw {
+  restaurantId: string;
+  restaurantName: string;
+  websiteUrl: string;
+  sourceUrl?: string;
+  weekly: true;
+  weekStart: string;
+  dishesByDay: Partial<Record<DayKey | 'week', { name: string; tags?: string[] }[]>>;
+  updatedAt: string;
+}
+
+/** Convert a weekly cached menu into the normal "today" menu shape used by the UI. */
+function weeklyToTodayMenu(raw: WeeklyMenuRaw, now: Date, todayKey: string) {
+  const dk = todayDayKey(now);
+  const byDay = raw?.dishesByDay ?? {};
+  const todays = Array.isArray(byDay[dk]) ? byDay[dk]! : [];
+  const weekList = Array.isArray(byDay.week) ? byDay.week! : [];
+  const weekPrefixed = weekList.map((d) => ({
+    ...d,
+    name: d?.name?.startsWith('(') ? d.name : `(Hela veckan) ${d.name}`,
+  }));
+  return {
+    restaurantId: raw.restaurantId,
+    restaurantName: raw.restaurantName,
+    websiteUrl: raw.websiteUrl,
+    sourceUrl: raw.sourceUrl,
+    date: todayKey,
+    dishes: [...todays, ...weekPrefixed],
+    updatedAt: raw.updatedAt,
+    weekly: true,
+    weekStart: raw.weekStart,
+  };
+}
+
 /** Check if current time (Europe/Stockholm) is within allowed fetch window:
  *  weekdays (Mon-Fri), hours 08:00-13:59. */
 function isWithinFetchWindow(date: Date): { allowed: boolean; reason?: string } {
