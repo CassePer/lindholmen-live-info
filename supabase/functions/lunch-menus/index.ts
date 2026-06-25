@@ -658,7 +658,7 @@ Deno.serve(async (req) => {
         }
         // Cooldown passed – clear cache and re-scrape
         console.log(`Force refresh allowed – cache is ${Math.floor(ageMs / 60000)}min old`);
-        await supabase.from('lunch_menu_cache').delete().eq('week_key', todayKey);
+        await supabase.from('lunch_menu_cache').delete().in('week_key', cacheKeys);
       } else {
         // Normal request – serve from cache
         console.log(`Serving ${cached.length} menus from cache for ${todayKey}`);
@@ -727,7 +727,7 @@ Deno.serve(async (req) => {
         for (const row of allCache as any[]) {
           const id = row.menu_data?.restaurantId;
           if (id && !latestByRestaurant.has(id)) {
-            latestByRestaurant.set(id, row.menu_data);
+            latestByRestaurant.set(id, normalizeMenuData(row.menu_data));
           }
         }
       }
