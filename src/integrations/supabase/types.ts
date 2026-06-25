@@ -65,6 +65,7 @@ export type Database = {
           name: string
           rss_url: string | null
           website_url: string
+          weekly_menu: boolean
         }
         Insert: {
           active?: boolean
@@ -74,6 +75,7 @@ export type Database = {
           name: string
           rss_url?: string | null
           website_url: string
+          weekly_menu?: boolean
         }
         Update: {
           active?: boolean
@@ -83,6 +85,7 @@ export type Database = {
           name?: string
           rss_url?: string | null
           website_url?: string
+          weekly_menu?: boolean
         }
         Relationships: []
       }

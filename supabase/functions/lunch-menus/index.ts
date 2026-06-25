@@ -18,6 +18,55 @@ function getTodayKey(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+/** Date key (YYYY-MM-DD) for the Monday of the given date's ISO week. */
+function mondayKeyOf(date: Date): string {
+  const d = new Date(date);
+  const day = d.getDay(); // 0=Sun, 1=Mon, ... 6=Sat
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return getTodayKey(d);
+}
+
+const DAY_KEYS_BY_INDEX = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
+type DayKey = typeof DAY_KEYS_BY_INDEX[number];
+function todayDayKey(date: Date): DayKey {
+  return DAY_KEYS_BY_INDEX[date.getDay()];
+}
+
+interface WeeklyMenuRaw {
+  restaurantId: string;
+  restaurantName: string;
+  websiteUrl: string;
+  sourceUrl?: string;
+  weekly: true;
+  weekStart: string;
+  dishesByDay: Partial<Record<DayKey | 'week', { name: string; tags?: string[] }[]>>;
+  updatedAt: string;
+}
+
+/** Convert a weekly cached menu into the normal "today" menu shape used by the UI. */
+function weeklyToTodayMenu(raw: WeeklyMenuRaw, now: Date, todayKey: string) {
+  const dk = todayDayKey(now);
+  const byDay = raw?.dishesByDay ?? {};
+  const todays = Array.isArray(byDay[dk]) ? byDay[dk]! : [];
+  const weekList = Array.isArray(byDay.week) ? byDay.week! : [];
+  const weekPrefixed = weekList.map((d) => ({
+    ...d,
+    name: d?.name?.startsWith('(') ? d.name : `(Hela veckan) ${d.name}`,
+  }));
+  return {
+    restaurantId: raw.restaurantId,
+    restaurantName: raw.restaurantName,
+    websiteUrl: raw.websiteUrl,
+    sourceUrl: raw.sourceUrl,
+    date: todayKey,
+    dishes: [...todays, ...weekPrefixed],
+    updatedAt: raw.updatedAt,
+    weekly: true,
+    weekStart: raw.weekStart,
+  };
+}
+
 /** Check if current time (Europe/Stockholm) is within allowed fetch window:
  *  weekdays (Mon-Fri), hours 08:00-13:59. */
 function isWithinFetchWindow(date: Date): { allowed: boolean; reason?: string } {
@@ -245,6 +294,74 @@ async function extractMenuFromScreenshot(
 
 const MIN_MARKDOWN_LENGTH = 200;
 
+function buildWeekPrompt(name: string): string {
+  return `Du är en menyextraherare. Restaurangen "${name}" publicerar HELA veckans meny på måndagen. Extrahera ALLA rätter strukturerat per veckodag (mån–fre).
+
+Svara ENBART med giltig JSON (inga kommentarer, ingen markdown), exakt detta schema:
+{
+  "dishesByDay": {
+    "mon": [{"name": "Rättens namn – beskrivning", "tags": ["vegetarisk"]}],
+    "tue": [],
+    "wed": [],
+    "thu": [],
+    "fri": [],
+    "week": []
+  }
+}
+
+REGLER:
+1. Lägg varje rätt under sin veckodag (mon/tue/wed/thu/fri). Ta med ALLA rätter den dagen – huvudrätter, soppor, tillbehör, efterrätter, vegetariska alternativ.
+2. INGET dagsprefix i namnet under "mon"/"tue"/… – strukturen anger redan dagen.
+3. "week"-listan ska INNEHÅLLA rätter som tydligt gäller HELA VECKAN (rubriker som "Veckans soppa", "Veckans sallad", "Alltid på menyn", "Hela veckan"). Lägg INTE in dagsspecifika rätter där.
+4. Dagsintervall (t.ex. "Ons–Tors: Fiskgryta"): duplicera rätten i VARJE veckodag som ingår i intervallet ("wed" och "thu" i exemplet).
+5. Inkludera rättens namn OCH dess beskrivning/tillbehör som en sammanhängande text. Ignorera priser.
+6. Hittar du inga rätter alls: returnera tomma listor för alla dagar.
+
+Taggar (bara om det TYDLIGT framgår): "vegetarisk", "vegansk", "fisk", "kött".`;
+}
+
+async function extractWeeklyMenuFromText(
+  name: string,
+  markdown: string,
+  apiKey: string
+): Promise<Record<string, { name: string; tags?: string[] }[]> | null> {
+  const prompt = buildWeekPrompt(name) + `\n\nText att analysera:\n${markdown.slice(0, 18000)}`;
+  try {
+    const res = await fetch(AI_GATEWAY, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.1,
+      }),
+    });
+    if (!res.ok) {
+      console.error(`AI weekly extraction failed for ${name}: ${res.status}`);
+      if (res.status === 402) aiCreditsExhausted = true;
+      return null;
+    }
+    const data = await res.json();
+    const content = data?.choices?.[0]?.message?.content || '';
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+    const parsed = JSON.parse(jsonMatch[0]);
+    const byDay = parsed?.dishesByDay;
+    if (!byDay || typeof byDay !== 'object') return null;
+    return byDay;
+  } catch (err) {
+    console.error(`AI weekly extraction error for ${name}:`, err);
+    return null;
+  }
+}
+
+function weeklyHasAnyDishes(byDay: Record<string, any>): boolean {
+  for (const k of Object.keys(byDay)) {
+    if (Array.isArray(byDay[k]) && byDay[k].length > 0) return true;
+  }
+  return false;
+}
+
 async function fetchRssMenu(rssUrl: string, todayStr: string): Promise<string | null> {
   try {
     const res = await fetch(rssUrl);
@@ -403,6 +520,12 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const now = new Date();
     const todayKey = getTodayKey(now);
+    const mondayKey = mondayKeyOf(now);
+    const cacheKeys = Array.from(new Set([todayKey, mondayKey]));
+
+    // Normalize a cache row's menu_data: weekly rows are projected to today's view.
+    const normalizeMenuData = (md: any) =>
+      md?.weekly ? weeklyToTodayMenu(md as WeeklyMenuRaw, now, todayKey) : md;
 
     const sortByName = (list: any[]) =>
       [...list].sort((a, b) =>
@@ -438,7 +561,12 @@ Deno.serve(async (req) => {
       const latestPrev = new Map<string, any>();
       for (const row of (prevRows ?? []) as any[]) {
         const id = row.menu_data?.restaurantId;
-        if (id && !latestPrev.has(id) && allowedPrevDatesGlobal.has(row.menu_data?.date)) {
+        if (!id || latestPrev.has(id)) continue;
+        if (row.menu_data?.weekly) {
+          if (row.menu_data?.weekStart === mondayKey) {
+            latestPrev.set(id, normalizeMenuData(row.menu_data));
+          }
+        } else if (allowedPrevDatesGlobal.has(row.menu_data?.date)) {
           latestPrev.set(id, row.menu_data);
         }
       }
@@ -459,19 +587,29 @@ Deno.serve(async (req) => {
     }
 
     // Check cache for today
-    const { data: cached, error: cacheError } = await supabase
+    const { data: cacheRowsAll, error: cacheError } = await supabase
       .from('lunch_menu_cache')
-      .select('menu_data, created_at')
-      .eq('week_key', todayKey);
+      .select('menu_data, created_at, week_key')
+      .in('week_key', cacheKeys);
 
-    if (!cacheError && cached && cached.length > 0) {
+    // Keep: today's daily rows + this week's weekly rows
+    const cached = (cacheRowsAll ?? []).filter((row: any) => {
+      if (row.menu_data?.weekly) return row.menu_data?.weekStart === mondayKey;
+      return row.week_key === todayKey;
+    });
+    // Whether we have any daily cache for today — drives "serve from cache" decision
+    const hasTodayDaily = (cacheRowsAll ?? []).some(
+      (row: any) => row.week_key === todayKey && !row.menu_data?.weekly
+    );
+
+    if (!cacheError && hasTodayDaily && cached.length > 0) {
       // Single restaurant refresh — bypass cooldown, re-scrape only one
       if (singleRestaurantId) {
         // Window check: only allow scraping on weekdays 08–14
         const window = isWithinFetchWindow(now);
         if (!window.allowed) {
           console.log(`Single refresh blocked – outside fetch window: ${window.reason}`);
-          const menus = sortByName((await fillMissingFromYesterday(cached.map((row: any) => row.menu_data))).map((m: any) => ({ ...m, stale: m?.date !== todayKey })));
+          const menus = sortByName((await fillMissingFromYesterday(cached.map((row: any) => normalizeMenuData(row.menu_data)))).map((m: any) => ({ ...m, stale: m?.date !== todayKey })));
           return new Response(
             JSON.stringify({ cooldown: true, minutesLeft: 0, reason: window.reason, menus }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -485,7 +623,7 @@ Deno.serve(async (req) => {
           if (ageMs < PER_REST_COOLDOWN_MS) {
             const minutesLeft = Math.ceil((PER_REST_COOLDOWN_MS - ageMs) / 60000);
             console.log(`Per-restaurant refresh blocked for ${singleRestaurantId} – ${minutesLeft}min left`);
-            const menus = sortByName((await fillMissingFromYesterday(cached.map((row: any) => row.menu_data))).map((m: any) => ({ ...m, stale: m?.date !== todayKey })));
+            const menus = sortByName((await fillMissingFromYesterday(cached.map((row: any) => normalizeMenuData(row.menu_data)))).map((m: any) => ({ ...m, stale: m?.date !== todayKey })));
             return new Response(
               JSON.stringify({ cooldown: true, minutesLeft, menus }),
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -498,7 +636,7 @@ Deno.serve(async (req) => {
         const window = isWithinFetchWindow(now);
         if (!window.allowed) {
           console.log(`Force refresh blocked – outside fetch window: ${window.reason}`);
-          const menus = sortByName((await fillMissingFromYesterday(cached.map((row: any) => row.menu_data))).map((m: any) => ({ ...m, stale: m?.date !== todayKey })));
+          const menus = sortByName((await fillMissingFromYesterday(cached.map((row: any) => normalizeMenuData(row.menu_data)))).map((m: any) => ({ ...m, stale: m?.date !== todayKey })));
           return new Response(
             JSON.stringify({ cooldown: true, minutesLeft: 0, reason: window.reason, menus }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -513,18 +651,18 @@ Deno.serve(async (req) => {
         if (ageMs < COOLDOWN_MS) {
           const minutesLeft = Math.ceil((COOLDOWN_MS - ageMs) / 60000);
           console.log(`Force refresh blocked – cache is ${Math.floor(ageMs / 60000)}min old, cooldown ${minutesLeft}min left`);
-          const menus = sortByName((await fillMissingFromYesterday(cached.map((row: any) => row.menu_data))).map((m: any) => ({ ...m, stale: m?.date !== todayKey })));
+          const menus = sortByName((await fillMissingFromYesterday(cached.map((row: any) => normalizeMenuData(row.menu_data)))).map((m: any) => ({ ...m, stale: m?.date !== todayKey })));
           return new Response(JSON.stringify({ cooldown: true, minutesLeft, menus }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
         // Cooldown passed – clear cache and re-scrape
         console.log(`Force refresh allowed – cache is ${Math.floor(ageMs / 60000)}min old`);
-        await supabase.from('lunch_menu_cache').delete().eq('week_key', todayKey);
+        await supabase.from('lunch_menu_cache').delete().in('week_key', cacheKeys);
       } else {
         // Normal request – serve from cache
         console.log(`Serving ${cached.length} menus from cache for ${todayKey}`);
-        const todaysMenus = cached.map((row: any) => row.menu_data);
+        const todaysMenus = cached.map((row: any) => normalizeMenuData(row.menu_data));
         const filled = await fillMissingFromYesterday(todaysMenus);
         const stamped = filled.map((m: any) => ({ ...m, stale: m?.date !== todayKey }));
         return new Response(JSON.stringify({ menus: sortByName(stamped) }), {
@@ -589,7 +727,7 @@ Deno.serve(async (req) => {
         for (const row of allCache as any[]) {
           const id = row.menu_data?.restaurantId;
           if (id && !latestByRestaurant.has(id)) {
-            latestByRestaurant.set(id, row.menu_data);
+            latestByRestaurant.set(id, normalizeMenuData(row.menu_data));
           }
         }
       }
@@ -604,6 +742,22 @@ Deno.serve(async (req) => {
     }
     const allowedPrevDates = new Set<string>([todayKey, yesterdayKey(now)]);
 
+    // Pre-load existing weekly cache for this Monday so we can SKIP re-scraping
+    // weekly_menu restaurants that already have a fresh weekly menu cached.
+    const weeklyCacheByRestaurant = new Map<string, WeeklyMenuRaw>();
+    {
+      const { data: weeklyRows } = await supabase
+        .from('lunch_menu_cache')
+        .select('menu_data')
+        .eq('week_key', mondayKey);
+      for (const row of (weeklyRows ?? []) as any[]) {
+        const md = row.menu_data;
+        if (md?.weekly && md?.weekStart === mondayKey && md?.restaurantId) {
+          weeklyCacheByRestaurant.set(md.restaurantId, md as WeeklyMenuRaw);
+        }
+      }
+    }
+
     const BATCH_SIZE = 4;
     const allMenus: unknown[] = [];
 
@@ -611,6 +765,51 @@ Deno.serve(async (req) => {
       const batch = restaurants.slice(i, i + BATCH_SIZE);
       const results = await Promise.all(
         batch.map(async (r: any) => {
+          // ── Weekly-menu restaurants: scrape at most ONCE per ISO week ──
+          if (r.weekly_menu) {
+            const cachedWeekly = weeklyCacheByRestaurant.get(r.id);
+            const forceThis = singleRestaurantId === r.id || (force && !singleRestaurantId);
+            if (cachedWeekly && !forceThis) {
+              // Reuse this week's cached weekly menu — no scrape, no cache write.
+              return { ...weeklyToTodayMenu(cachedWeekly, now, todayKey), _substituted: true };
+            }
+            // Scrape full page and extract structured per-day menu
+            const { markdown } = await scrapeUrl(r.menu_url, firecrawlKey);
+            let byDay: Record<string, { name: string; tags?: string[] }[]> | null = null;
+            if (markdown && markdown.length >= MIN_MARKDOWN_LENGTH) {
+              byDay = await extractWeeklyMenuFromText(r.name, markdown, lovableKey);
+            }
+            if (!byDay || !weeklyHasAnyDishes(byDay)) {
+              // Fallback: keep previously known menu (today's view) for this restaurant
+              const prev = latestByRestaurant.get(r.id);
+              if (prev && (prev.weekly ? prev.weekStart === mondayKey : allowedPrevDates.has(prev.date))) {
+                return { ...prev, _substituted: true };
+              }
+              // Stub so it still appears with a heading
+              return {
+                restaurantId: r.id,
+                restaurantName: r.name,
+                websiteUrl: r.website_url,
+                sourceUrl: r.menu_url,
+                date: todayKey,
+                dishes: [],
+                updatedAt: '',
+              };
+            }
+            const rawWeekly: WeeklyMenuRaw = {
+              restaurantId: r.id,
+              restaurantName: r.name,
+              websiteUrl: r.website_url,
+              sourceUrl: r.menu_url,
+              weekly: true,
+              weekStart: mondayKey,
+              dishesByDay: byDay,
+              updatedAt: now.toISOString(),
+            };
+            const todayMenu = weeklyToTodayMenu(rawWeekly, now, todayKey);
+            return { ...todayMenu, _weeklyRaw: rawWeekly };
+          }
+
           let dishes: { name: string; tags?: string[] }[] = [];
 
           // Try Compass Group cascade: daily RSS → JSON → weekly RSS
@@ -692,12 +891,26 @@ Deno.serve(async (req) => {
     // Only cache menus that actually got dishes — don't overwrite good cache with empty
     // results caused by AI failures (e.g. 402 credits exhausted).
     const rowsToCache = (allMenus as any[])
-      .filter((menu: any) => menu.dishes.length > 0 && !menu._substituted && menu.date === todayKey)
-      .map((menu: any) => ({
-        week_key: todayKey,
-        restaurant_id: menu.restaurantId,
-        menu_data: menu,
-      }));
+      .filter((menu: any) => !menu._substituted)
+      .map((menu: any) => {
+        // Weekly menu → store the RAW per-day structure under the Monday week_key
+        if (menu._weeklyRaw) {
+          return {
+            week_key: mondayKey,
+            restaurant_id: menu.restaurantId,
+            menu_data: menu._weeklyRaw,
+          };
+        }
+        if (menu.dishes.length > 0 && menu.date === todayKey) {
+          return {
+            week_key: todayKey,
+            restaurant_id: menu.restaurantId,
+            menu_data: menu,
+          };
+        }
+        return null;
+      })
+      .filter((row: any) => row !== null);
 
     if (rowsToCache.length > 0) {
       const { error: insertError } = await supabase
@@ -706,7 +919,7 @@ Deno.serve(async (req) => {
       if (insertError) {
         console.error('Cache insert error:', insertError);
       } else {
-        console.log(`Cached ${rowsToCache.length} menus for ${todayKey}`);
+        console.log(`Cached ${rowsToCache.length} menus (today=${todayKey}, weekStart=${mondayKey})`);
       }
     } else {
       console.log(`Skipping cache write — 0 menus had dishes (aiCreditsExhausted=${aiCreditsExhausted})`);
@@ -715,7 +928,7 @@ Deno.serve(async (req) => {
     // Helper: stamp `stale` if the menu's date doesn't match today.
     const withStale = (list: any[]) =>
       list.map((m: any) => {
-        const { _substituted, ...rest } = m ?? {};
+        const { _substituted, _weeklyRaw, ...rest } = m ?? {};
         return { ...rest, stale: rest?.date !== todayKey };
       });
 
@@ -723,8 +936,8 @@ Deno.serve(async (req) => {
     if (singleRestaurantId && cached && cached.length > 0) {
       const updatedIds = new Set(allMenus.map((m: any) => m.restaurantId));
       const existingMenus = cached
-        .filter((row: any) => !updatedIds.has(row.menu_data.restaurantId))
-        .map((row: any) => row.menu_data);
+        .filter((row: any) => !updatedIds.has(row.menu_data?.restaurantId))
+        .map((row: any) => normalizeMenuData(row.menu_data));
       const merged = [...existingMenus, ...allMenus];
       console.log(`Merged: ${allMenus.length} refreshed + ${existingMenus.length} cached = ${merged.length} total`);
       return new Response(JSON.stringify({ menus: sortByName(withStale(merged)), aiCreditsExhausted }), {
