@@ -107,6 +107,7 @@ interface Restaurant {
   menu_url: string;
   active: boolean;
   created_at: string;
+  weekly_menu?: boolean;
 }
 
 function useRestaurants() {
