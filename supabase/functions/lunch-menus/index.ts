@@ -409,6 +409,43 @@ Deno.serve(async (req) => {
         String(a?.restaurantName ?? '').localeCompare(String(b?.restaurantName ?? ''), 'sv')
       );
 
+    // Helper used by both cache-serve and scrape paths: for any active
+    // restaurant missing from today's results, substitute yesterday's menu
+    // (marked stale). Never reaches further back than 1 day.
+    function yesterdayKeyOf(d: Date): string {
+      const y = new Date(d);
+      y.setDate(y.getDate() - 1);
+      return getTodayKey(y);
+    }
+    const allowedPrevDatesGlobal = new Set<string>([todayKey, yesterdayKeyOf(now)]);
+
+    async function fillMissingFromYesterday(menus: any[]): Promise<any[]> {
+      const haveIds = new Set(menus.map((m: any) => m?.restaurantId));
+      const { data: activeRest } = await supabase
+        .from('restaurants')
+        .select('id')
+        .eq('active', true);
+      const missingIds = (activeRest ?? [])
+        .map((r: any) => r.id)
+        .filter((id: string) => !haveIds.has(id));
+      if (missingIds.length === 0) return menus;
+
+      const { data: prevRows } = await supabase
+        .from('lunch_menu_cache')
+        .select('menu_data, created_at')
+        .in('restaurant_id', missingIds)
+        .order('created_at', { ascending: false })
+        .limit(missingIds.length * 5);
+      const latestPrev = new Map<string, any>();
+      for (const row of (prevRows ?? []) as any[]) {
+        const id = row.menu_data?.restaurantId;
+        if (id && !latestPrev.has(id) && allowedPrevDatesGlobal.has(row.menu_data?.date)) {
+          latestPrev.set(id, row.menu_data);
+        }
+      }
+      return [...menus, ...Array.from(latestPrev.values())];
+    }
+
     // Check cache for today
     const { data: cached, error: cacheError } = await supabase
       .from('lunch_menu_cache')
@@ -422,7 +459,7 @@ Deno.serve(async (req) => {
         const window = isWithinFetchWindow(now);
         if (!window.allowed) {
           console.log(`Single refresh blocked – outside fetch window: ${window.reason}`);
-          const menus = sortByName(cached.map((row: any) => row.menu_data));
+          const menus = sortByName((await fillMissingFromYesterday(cached.map((row: any) => row.menu_data))).map((m: any) => ({ ...m, stale: m?.date !== todayKey })));
           return new Response(
             JSON.stringify({ cooldown: true, minutesLeft: 0, reason: window.reason, menus }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -436,7 +473,7 @@ Deno.serve(async (req) => {
           if (ageMs < PER_REST_COOLDOWN_MS) {
             const minutesLeft = Math.ceil((PER_REST_COOLDOWN_MS - ageMs) / 60000);
             console.log(`Per-restaurant refresh blocked for ${singleRestaurantId} – ${minutesLeft}min left`);
-            const menus = sortByName(cached.map((row: any) => row.menu_data));
+            const menus = sortByName((await fillMissingFromYesterday(cached.map((row: any) => row.menu_data))).map((m: any) => ({ ...m, stale: m?.date !== todayKey })));
             return new Response(
               JSON.stringify({ cooldown: true, minutesLeft, menus }),
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -449,7 +486,7 @@ Deno.serve(async (req) => {
         const window = isWithinFetchWindow(now);
         if (!window.allowed) {
           console.log(`Force refresh blocked – outside fetch window: ${window.reason}`);
-          const menus = sortByName(cached.map((row: any) => row.menu_data));
+          const menus = sortByName((await fillMissingFromYesterday(cached.map((row: any) => row.menu_data))).map((m: any) => ({ ...m, stale: m?.date !== todayKey })));
           return new Response(
             JSON.stringify({ cooldown: true, minutesLeft: 0, reason: window.reason, menus }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -464,7 +501,7 @@ Deno.serve(async (req) => {
         if (ageMs < COOLDOWN_MS) {
           const minutesLeft = Math.ceil((COOLDOWN_MS - ageMs) / 60000);
           console.log(`Force refresh blocked – cache is ${Math.floor(ageMs / 60000)}min old, cooldown ${minutesLeft}min left`);
-          const menus = sortByName(cached.map((row: any) => row.menu_data));
+          const menus = sortByName((await fillMissingFromYesterday(cached.map((row: any) => row.menu_data))).map((m: any) => ({ ...m, stale: m?.date !== todayKey })));
           return new Response(JSON.stringify({ cooldown: true, minutesLeft, menus }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
@@ -475,8 +512,10 @@ Deno.serve(async (req) => {
       } else {
         // Normal request – serve from cache
         console.log(`Serving ${cached.length} menus from cache for ${todayKey}`);
-        const menus = sortByName(cached.map((row: any) => row.menu_data));
-        return new Response(JSON.stringify({ menus }), {
+        const todaysMenus = cached.map((row: any) => row.menu_data);
+        const filled = await fillMissingFromYesterday(todaysMenus);
+        const stamped = filled.map((m: any) => ({ ...m, stale: m?.date !== todayKey }));
+        return new Response(JSON.stringify({ menus: sortByName(stamped) }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
