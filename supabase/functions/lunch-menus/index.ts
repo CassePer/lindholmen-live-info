@@ -423,12 +423,11 @@ Deno.serve(async (req) => {
       const haveIds = new Set(menus.map((m: any) => m?.restaurantId));
       const { data: activeRest } = await supabase
         .from('restaurants')
-        .select('id')
+        .select('id, name, website_url, menu_url')
         .eq('active', true);
-      const missingIds = (activeRest ?? [])
-        .map((r: any) => r.id)
-        .filter((id: string) => !haveIds.has(id));
-      if (missingIds.length === 0) return menus;
+      const missingRest = (activeRest ?? []).filter((r: any) => !haveIds.has(r.id));
+      if (missingRest.length === 0) return menus;
+      const missingIds = missingRest.map((r: any) => r.id);
 
       const { data: prevRows } = await supabase
         .from('lunch_menu_cache')
@@ -443,7 +442,20 @@ Deno.serve(async (req) => {
           latestPrev.set(id, row.menu_data);
         }
       }
-      return [...menus, ...Array.from(latestPrev.values())];
+      // For restaurants without ANY usable data, still return a stub so they
+      // always appear in "Dagens lunch" with at least a heading.
+      const stubs = missingRest
+        .filter((r: any) => !latestPrev.has(r.id))
+        .map((r: any) => ({
+          restaurantId: r.id,
+          restaurantName: r.name,
+          websiteUrl: r.website_url,
+          sourceUrl: r.menu_url,
+          date: todayKey,
+          dishes: [],
+          updatedAt: '',
+        }));
+      return [...menus, ...Array.from(latestPrev.values()), ...stubs];
     }
 
     // Check cache for today
