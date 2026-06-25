@@ -294,6 +294,74 @@ async function extractMenuFromScreenshot(
 
 const MIN_MARKDOWN_LENGTH = 200;
 
+function buildWeekPrompt(name: string): string {
+  return `Du är en menyextraherare. Restaurangen "${name}" publicerar HELA veckans meny på måndagen. Extrahera ALLA rätter strukturerat per veckodag (mån–fre).
+
+Svara ENBART med giltig JSON (inga kommentarer, ingen markdown), exakt detta schema:
+{
+  "dishesByDay": {
+    "mon": [{"name": "Rättens namn – beskrivning", "tags": ["vegetarisk"]}],
+    "tue": [],
+    "wed": [],
+    "thu": [],
+    "fri": [],
+    "week": []
+  }
+}
+
+REGLER:
+1. Lägg varje rätt under sin veckodag (mon/tue/wed/thu/fri). Ta med ALLA rätter den dagen – huvudrätter, soppor, tillbehör, efterrätter, vegetariska alternativ.
+2. INGET dagsprefix i namnet under "mon"/"tue"/… – strukturen anger redan dagen.
+3. "week"-listan ska INNEHÅLLA rätter som tydligt gäller HELA VECKAN (rubriker som "Veckans soppa", "Veckans sallad", "Alltid på menyn", "Hela veckan"). Lägg INTE in dagsspecifika rätter där.
+4. Dagsintervall (t.ex. "Ons–Tors: Fiskgryta"): duplicera rätten i VARJE veckodag som ingår i intervallet ("wed" och "thu" i exemplet).
+5. Inkludera rättens namn OCH dess beskrivning/tillbehör som en sammanhängande text. Ignorera priser.
+6. Hittar du inga rätter alls: returnera tomma listor för alla dagar.
+
+Taggar (bara om det TYDLIGT framgår): "vegetarisk", "vegansk", "fisk", "kött".`;
+}
+
+async function extractWeeklyMenuFromText(
+  name: string,
+  markdown: string,
+  apiKey: string
+): Promise<Record<string, { name: string; tags?: string[] }[]> | null> {
+  const prompt = buildWeekPrompt(name) + `\n\nText att analysera:\n${markdown.slice(0, 18000)}`;
+  try {
+    const res = await fetch(AI_GATEWAY, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.1,
+      }),
+    });
+    if (!res.ok) {
+      console.error(`AI weekly extraction failed for ${name}: ${res.status}`);
+      if (res.status === 402) aiCreditsExhausted = true;
+      return null;
+    }
+    const data = await res.json();
+    const content = data?.choices?.[0]?.message?.content || '';
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+    const parsed = JSON.parse(jsonMatch[0]);
+    const byDay = parsed?.dishesByDay;
+    if (!byDay || typeof byDay !== 'object') return null;
+    return byDay;
+  } catch (err) {
+    console.error(`AI weekly extraction error for ${name}:`, err);
+    return null;
+  }
+}
+
+function weeklyHasAnyDishes(byDay: Record<string, any>): boolean {
+  for (const k of Object.keys(byDay)) {
+    if (Array.isArray(byDay[k]) && byDay[k].length > 0) return true;
+  }
+  return false;
+}
+
 async function fetchRssMenu(rssUrl: string, todayStr: string): Promise<string | null> {
   try {
     const res = await fetch(rssUrl);
