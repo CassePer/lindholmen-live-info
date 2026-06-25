@@ -561,7 +561,12 @@ Deno.serve(async (req) => {
       const latestPrev = new Map<string, any>();
       for (const row of (prevRows ?? []) as any[]) {
         const id = row.menu_data?.restaurantId;
-        if (id && !latestPrev.has(id) && allowedPrevDatesGlobal.has(row.menu_data?.date)) {
+        if (!id || latestPrev.has(id)) continue;
+        if (row.menu_data?.weekly) {
+          if (row.menu_data?.weekStart === mondayKey) {
+            latestPrev.set(id, normalizeMenuData(row.menu_data));
+          }
+        } else if (allowedPrevDatesGlobal.has(row.menu_data?.date)) {
           latestPrev.set(id, row.menu_data);
         }
       }
