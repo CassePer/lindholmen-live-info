@@ -67,11 +67,21 @@ function ErrorState({ message }: { message: string }) {
 }
 
 function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit", hour12: false });
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit", hour12: false });
 }
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("sv-SE", { year: "numeric", month: "2-digit", day: "2-digit" });
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("sv-SE", { year: "numeric", month: "2-digit", day: "2-digit" });
+}
+
+function isValidDate(iso: string | undefined | null) {
+  if (!iso) return false;
+  const d = new Date(iso);
+  return !isNaN(d.getTime());
 }
 
 const SE_WEEKDAYS = ["mån", "tis", "ons", "tors", "fre"];
@@ -228,14 +238,25 @@ function RestaurantCard({ menu, search, onRefresh, isRefreshing }: { menu: Lunch
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-muted-foreground italic">Ingen meny hittades</p>
+          <p className="text-sm text-muted-foreground italic">
+            Menyn kunde inte hämtas just nu. Besök{" "}
+            <a
+              href={menu.websiteUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-primary"
+            >
+              restaurangens webbplats
+            </a>{" "}
+            för dagens lunch.
+          </p>
         )}
-        {menu.updatedAt && (
+        {isValidDate(menu.updatedAt) && (
           <p className="text-xs text-muted-foreground pt-2">
             Uppdaterad: {formatDate(menu.updatedAt)} kl {formatTime(menu.updatedAt)}
           </p>
         )}
-        {menu.stale && (
+        {menu.stale && isValidDate(menu.updatedAt) && (
           <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
             Ej dagens meny – visar senast hämtade ({formatDate(menu.updatedAt)})
           </p>
