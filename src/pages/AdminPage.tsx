@@ -329,14 +329,61 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
               </div>
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Lunch – automatisk uppdatering (timme, 0–23)</label>
+              <label className="text-sm font-medium mb-1 block">Lunch – automatisk uppdatering (tid)</label>
               <div className="flex gap-2">
-                <Input type="number" min="0" max="23" value={currentLunchHour} onChange={(e) => setLunchHour(e.target.value)} className="w-32" />
-                <Button size="sm" onClick={() => saveSettingMutation.mutate({ key: "lunch_auto_refresh_hour", value: currentLunchHour })} disabled={saveSettingMutation.isPending}>
+                <Input type="time" value={currentLunchTime} onChange={(e) => setLunchTime(e.target.value)} className="w-32" />
+                <Button size="sm" onClick={() => saveSettingMutation.mutate({ key: "lunch_auto_refresh_time", value: currentLunchTime })} disabled={saveSettingMutation.isPending}>
                   {saveSettingMutation.isPending ? "Sparar..." : "Spara"}
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Lunchmenyer hämtas om automatiskt vid denna tidpunkt varje dag.</p>
+              <p className="text-xs text-muted-foreground mt-1">Vid denna tid varje dag växlar appen till dagens meny (t.ex. 00:01 = strax efter midnatt).</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Lunch – tillåtet uppdateringsfönster (timme, 0–23)</label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min="0"
+                  max="23"
+                  value={currentLunchWindowStart}
+                  onChange={(e) => setLunchWindowStart(e.target.value)}
+                  className="w-20"
+                  aria-label="Från kl"
+                />
+                <span className="text-sm text-muted-foreground">till</span>
+                <Input
+                  type="number"
+                  min="1"
+                  max="24"
+                  value={currentLunchWindowEnd}
+                  onChange={(e) => setLunchWindowEnd(e.target.value)}
+                  className="w-20"
+                  aria-label="Till kl"
+                />
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    saveSettingMutation.mutate({ key: "lunch_fetch_window_start", value: currentLunchWindowStart });
+                    saveSettingMutation.mutate({ key: "lunch_fetch_window_end", value: currentLunchWindowEnd });
+                  }}
+                  disabled={saveSettingMutation.isPending}
+                >
+                  Spara
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Manuella och automatiska hämtningar tillåts endast inom detta intervall (vardagar).</p>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <Checkbox
+                id="hide-refresh-when-complete"
+                checked={hideRefreshWhenComplete}
+                onCheckedChange={(v) =>
+                  saveSettingMutation.mutate({ key: "lunch_hide_refresh_when_complete", value: String(v) })
+                }
+              />
+              <Label htmlFor="hide-refresh-when-complete">
+                Dölj/inaktivera uppdateringsknappar när dagens meny finns
+              </Label>
             </div>
             <div className="border-t pt-3 mt-3">
               <label className="text-sm font-medium mb-1 block">TV-läge – IP-range (CIDR, kommaseparerat)</label>
