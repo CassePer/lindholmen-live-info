@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { useLunchMenus } from "@/hooks/use-lunch";
+import { useAppSettings } from "@/hooks/use-app-settings";
 import { SearchInput } from "@/components/SearchInput";
 import { HighlightText } from "@/components/HighlightText";
 import { Button } from "@/components/ui/button";
@@ -111,24 +112,29 @@ function fmtStockholmHHMM(d: Date) {
 
 function getRefreshState(
   updatedAt: string | undefined,
-  now: Date = new Date()
+  now: Date = new Date(),
+  windowStart = 6,
+  windowEnd = 14,
 ): { allowed: boolean; reason?: string; nextLabel?: string } {
   const { weekday, hour } = stockholmParts(now);
   const isWeekday = SE_WEEKDAYS.includes(weekday);
-  const inWindow = isWeekday && hour >= 8 && hour < 14;
+  const inWindow = isWeekday && hour >= windowStart && hour < windowEnd;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const startLabel = `${pad(windowStart)}:00`;
 
   if (!inWindow) {
     let nextLabel: string;
     if (!isWeekday) {
-      nextLabel = "Öppnar måndag kl 08:00";
-    } else if (hour < 8) {
-      nextLabel = "Öppnar idag kl 08:00";
+      nextLabel = `Öppnar måndag kl ${startLabel}`;
+    } else if (hour < windowStart) {
+      nextLabel = `Öppnar idag kl ${startLabel}`;
     } else {
-      nextLabel = weekday === "fre" ? "Öppnar måndag kl 08:00" : "Öppnar imorgon kl 08:00";
+      nextLabel =
+        weekday === "fre" ? `Öppnar måndag kl ${startLabel}` : `Öppnar imorgon kl ${startLabel}`;
     }
     return {
       allowed: false,
-      reason: "Hämtning är endast tillåten vardagar kl 08–14.",
+      reason: `Hämtning är endast tillåten vardagar kl ${pad(windowStart)}–${pad(windowEnd)}.`,
       nextLabel,
     };
   }
@@ -136,12 +142,13 @@ function getRefreshState(
   const cooldownEnd = updatedAt ? new Date(new Date(updatedAt).getTime() + 60 * 60 * 1000) : null;
   if (cooldownEnd && cooldownEnd > now) {
     const cd = stockholmParts(cooldownEnd);
-    const cdInWindow = SE_WEEKDAYS.includes(cd.weekday) && cd.hour >= 8 && cd.hour < 14;
+    const cdInWindow =
+      SE_WEEKDAYS.includes(cd.weekday) && cd.hour >= windowStart && cd.hour < windowEnd;
     const nextLabel = cdInWindow
       ? `Nästa uppdatering kl ${fmtStockholmHHMM(cooldownEnd)}`
       : weekday === "fre"
-      ? "Nästa uppdatering måndag kl 08:00"
-      : "Nästa uppdatering imorgon kl 08:00";
+      ? `Nästa uppdatering måndag kl ${startLabel}`
+      : `Nästa uppdatering imorgon kl ${startLabel}`;
     return {
       allowed: false,
       reason: "Menyn uppdaterades inom senaste timmen.",
