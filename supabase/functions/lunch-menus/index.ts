@@ -68,8 +68,12 @@ function weeklyToTodayMenu(raw: WeeklyMenuRaw, now: Date, todayKey: string) {
 }
 
 /** Check if current time (Europe/Stockholm) is within allowed fetch window:
- *  weekdays (Mon-Fri), hours 08:00-13:59. */
-function isWithinFetchWindow(date: Date): { allowed: boolean; reason?: string } {
+ *  weekdays (Mon-Fri), configurable hours [startHour, endHour). */
+function isWithinFetchWindow(
+  date: Date,
+  startHour = 6,
+  endHour = 14,
+): { allowed: boolean; reason?: string } {
   const parts = new Intl.DateTimeFormat('sv-SE', {
     timeZone: 'Europe/Stockholm',
     weekday: 'short',
@@ -82,7 +86,13 @@ function isWithinFetchWindow(date: Date): { allowed: boolean; reason?: string } 
   // sv-SE short weekday: mån, tis, ons, tors, fre, lör, sön
   const isWeekday = ['mån', 'tis', 'ons', 'tors', 'fre'].includes(weekday);
   if (!isWeekday) return { allowed: false, reason: 'Hämtning av menyer är endast tillåten på vardagar (mån–fre).' };
-  if (hour < 8 || hour >= 14) return { allowed: false, reason: 'Hämtning av menyer är endast tillåten kl 08–14.' };
+  if (hour < startHour || hour >= endHour) {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return {
+      allowed: false,
+      reason: `Hämtning av menyer är endast tillåten kl ${pad(startHour)}–${pad(endHour)}.`,
+    };
+  }
   return { allowed: true };
 }
 
