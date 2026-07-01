@@ -362,17 +362,10 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
     m.dishes.some((d) => d.name.toLowerCase().includes(activeSearch.toLowerCase()))
   );
 
-  // Today's date key in Europe/Stockholm (YYYY-MM-DD) to compare against menu.date.
-  const todayKey = new Intl.DateTimeFormat("sv-SE", {
-    timeZone: "Europe/Stockholm",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  })
-    .format(new Date())
-    .replace(/\//g, "-");
-  const isTodaysMenu = (m: LunchMenu) =>
-    m.date === todayKey && !m.stale && m.dishes.length > 0;
+  // A restaurant is "done for today" when the edge function returned a fresh
+  // (non-stale) menu with dishes. We rely on the server-set `stale` flag so
+  // we don't get bitten by client/server timezone drift near midnight.
+  const isTodaysMenu = (m: LunchMenu) => !m.stale && m.dishes.length > 0;
   const allTodaysMenusPresent = menus.length > 0 && menus.every(isTodaysMenu);
   const hideGlobalRefresh = hideWhenComplete && allTodaysMenusPresent;
 
