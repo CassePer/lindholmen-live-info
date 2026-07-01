@@ -633,7 +633,7 @@ Deno.serve(async (req) => {
       // Single restaurant refresh — bypass cooldown, re-scrape only one
       if (singleRestaurantId) {
         // Window check: only allow scraping on weekdays 08–14
-        const window = isWithinFetchWindow(now);
+        const window = isWithinFetchWindow(now, windowStart, windowEnd);
         if (!window.allowed) {
           console.log(`Single refresh blocked – outside fetch window: ${window.reason}`);
           const menus = sortByName((await fillMissingFromYesterday(cached.map((row: any) => normalizeMenuData(row.menu_data)))).map((m: any) => ({ ...m, stale: m?.date !== todayKey })));
@@ -660,7 +660,7 @@ Deno.serve(async (req) => {
         console.log(`Single restaurant refresh for ${singleRestaurantId}`);
       } else if (force) {
         // Window check: only allow scraping on weekdays 08–14
-        const window = isWithinFetchWindow(now);
+        const window = isWithinFetchWindow(now, windowStart, windowEnd);
         if (!window.allowed) {
           console.log(`Force refresh blocked – outside fetch window: ${window.reason}`);
           const menus = sortByName((await fillMissingFromYesterday(cached.map((row: any) => normalizeMenuData(row.menu_data)))).map((m: any) => ({ ...m, stale: m?.date !== todayKey })));
@@ -698,7 +698,7 @@ Deno.serve(async (req) => {
       }
     } else if (force || singleRestaurantId) {
       // No cache yet — still enforce window for any scrape attempt
-      const window = isWithinFetchWindow(now);
+      const window = isWithinFetchWindow(now, windowStart, windowEnd);
       if (!window.allowed) {
         console.log(`Refresh blocked – outside fetch window: ${window.reason}`);
         return new Response(
@@ -709,7 +709,7 @@ Deno.serve(async (req) => {
       console.log(`Force refresh – no existing cache to check cooldown against`);
     } else {
       // Normal request with no cache: only scrape inside the fetch window
-      const window = isWithinFetchWindow(now);
+      const window = isWithinFetchWindow(now, windowStart, windowEnd);
       if (!window.allowed) {
         console.log(`Initial scrape blocked – outside fetch window: ${window.reason}`);
         return new Response(
