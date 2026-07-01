@@ -298,11 +298,22 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
   const [search, setSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const { data, isLoading, error } = useLunchMenus();
+  const { data: settings } = useAppSettings();
   const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshingId, setRefreshingId] = useState<string | null>(null);
 
   const activeSearch = showSearch ? search : "";
+
+  const windowStart = (() => {
+    const n = parseInt(settings?.lunch_fetch_window_start ?? "6", 10);
+    return Number.isFinite(n) ? Math.max(0, Math.min(23, n)) : 6;
+  })();
+  const windowEnd = (() => {
+    const n = parseInt(settings?.lunch_fetch_window_end ?? "14", 10);
+    return Number.isFinite(n) ? Math.max(1, Math.min(24, n)) : 14;
+  })();
+  const hideWhenComplete = settings?.lunch_hide_refresh_when_complete !== "false";
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -351,6 +362,20 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
     m.dishes.some((d) => d.name.toLowerCase().includes(activeSearch.toLowerCase()))
   );
 
+  // Today's date key in Europe/Stockholm (YYYY-MM-DD) to compare against menu.date.
+  const todayKey = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Stockholm",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .format(new Date())
+    .replace(/\//g, "-");
+  const isTodaysMenu = (m: LunchMenu) =>
+    m.date === todayKey && !m.stale && m.dishes.length > 0;
+  const allTodaysMenusPresent = menus.length > 0 && menus.every(isTodaysMenu);
+  const hideGlobalRefresh = hideWhenComplete && allTodaysMenusPresent;
+
   const content = (
     <div className={embedded ? "space-y-4" : "container max-w-lg mx-auto px-4 py-6 space-y-4"}>
       <div className="flex items-center justify-between">
@@ -371,9 +396,11 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
           <Button variant="ghost" size="icon" onClick={() => { setShowSearch((v) => !v); if (showSearch) setSearch(""); }} aria-label="Sök lunchmenyer">
             <SearchIcon className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={handleRefresh} disabled={isRefreshing} aria-label="Uppdatera lunchmenyer">
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-          </Button>
+          {!hideGlobalRefresh && (
+            <Button variant="ghost" size="icon" onClick={handleRefresh} disabled={isRefreshing} aria-label="Uppdatera lunchmenyer">
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+            </Button>
+          )}
         </motion.div>
       </div>
 
@@ -416,7 +443,16 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
                 exit={{ opacity: 0, scale: 0.95 }}
                 layout
               >
-                <RestaurantCard menu={menu} search={activeSearch} onRefresh={handleRefreshSingle} isRefreshing={refreshingId === menu.restaurantId} />
+                <RestaurantCard
+                  menu={menu}
+                  search={activeSearch}
+                  onRefresh={handleRefreshSingle}
+                  isRefreshing={refreshingId === menu.restaurantId}
+                  windowStart={windowStart}
+                  windowEnd={windowEnd}
+                  hasTodaysMenu={isTodaysMenu(menu)}
+                  hideWhenComplete={hideWhenComplete}
+                />
               </motion.div>
             ))}
           </AnimatePresence>
