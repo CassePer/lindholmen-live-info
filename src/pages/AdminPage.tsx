@@ -217,7 +217,9 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [menuUrl, setMenuUrl] = useState("");
   const [refreshInterval, setRefreshInterval] = useState<string | null>(null);
-  const [lunchHour, setLunchHour] = useState<string | null>(null);
+  const [lunchTime, setLunchTime] = useState<string | null>(null);
+  const [lunchWindowStart, setLunchWindowStart] = useState<string | null>(null);
+  const [lunchWindowEnd, setLunchWindowEnd] = useState<string | null>(null);
   const [tvIpRange, setTvIpRange] = useState<string | null>(null);
   const [tvIframeUrl, setTvIframeUrl] = useState<string | null>(null);
   const [stopBus, setStopBus] = useState<string | null>(null);
@@ -226,7 +228,18 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
 
   const currentIntervalSec = parseInt(refreshInterval ?? settings?.departure_refresh_interval ?? "60", 10);
   const currentIntervalMin = String(Math.round(currentIntervalSec / 60) || 1);
-  const currentLunchHour = lunchHour ?? settings?.lunch_auto_refresh_hour ?? "10";
+  // Auto-refresh time (HH:MM). Fallback: legacy `lunch_auto_refresh_hour` → "HH:00", else "00:01".
+  const legacyHour = settings?.lunch_auto_refresh_hour;
+  const storedTime = settings?.lunch_auto_refresh_time;
+  const derivedTime = storedTime && /^\d{1,2}:\d{2}$/.test(storedTime)
+    ? storedTime.padStart(5, "0")
+    : legacyHour !== undefined
+    ? `${String(parseInt(legacyHour, 10) || 0).padStart(2, "0")}:00`
+    : "00:01";
+  const currentLunchTime = lunchTime ?? derivedTime;
+  const currentLunchWindowStart = lunchWindowStart ?? settings?.lunch_fetch_window_start ?? "6";
+  const currentLunchWindowEnd = lunchWindowEnd ?? settings?.lunch_fetch_window_end ?? "14";
+  const hideRefreshWhenComplete = settings?.lunch_hide_refresh_when_complete !== "false";
   const currentStopBus = stopBus ?? settings?.departure_stop_bus ?? "740059410";
   const currentStopTram = stopTram ?? settings?.departure_stop_tram ?? "740059410";
   const currentStopFerry = stopFerry ?? settings?.departure_stop_ferry ?? "740059412";
