@@ -3,15 +3,31 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getLunchMenus, type LunchMenusResult } from "@/services/lunch";
 import { useAppSettings } from "@/hooks/use-app-settings";
 
-function isWeekend() {
-  const day = new Date().getDay();
-  return day === 0 || day === 6;
+/** Parse "HH:MM" → {h, m}. Falls back to `lunch_auto_refresh_hour` (HH:00) or 00:01. */
+function parseAutoRefreshTime(
+  timeStr: string | undefined,
+  hourStr: string | undefined,
+): { h: number; m: number } {
+  if (timeStr && /^\d{1,2}:\d{2}$/.test(timeStr)) {
+    const [h, m] = timeStr.split(":").map((s) => parseInt(s, 10));
+    if (Number.isFinite(h) && Number.isFinite(m) && h >= 0 && h < 24 && m >= 0 && m < 60) {
+      return { h, m };
+    }
+  }
+  if (hourStr !== undefined) {
+    const h = parseInt(hourStr, 10);
+    if (Number.isFinite(h) && h >= 0 && h < 24) return { h, m: 0 };
+  }
+  return { h: 0, m: 1 };
 }
 
 export function useLunchMenus() {
   const queryClient = useQueryClient();
   const { data: settings } = useAppSettings();
-  const refreshHour = parseInt(settings?.lunch_auto_refresh_hour ?? "10", 10);
+  const { h: refreshHour, m: refreshMinute } = parseAutoRefreshTime(
+    settings?.lunch_auto_refresh_time,
+    settings?.lunch_auto_refresh_hour,
+  );
   const updateWeekends = settings?.lunch_update_weekends !== "false";
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -26,7 +42,7 @@ export function useLunchMenus() {
     function scheduleNext() {
       const now = new Date();
       const target = new Date(now);
-      target.setHours(refreshHour, 0, 0, 0);
+      target.setHours(refreshHour, refreshMinute, 0, 0);
       if (target <= now) {
         target.setDate(target.getDate() + 1);
       }
@@ -46,7 +62,7 @@ export function useLunchMenus() {
     }
     scheduleNext();
     return () => clearTimeout(timerRef.current);
-  }, [refreshHour, updateWeekends, forceRefresh]);
+  }, [refreshHour, refreshMinute, updateWeekends, forceRefresh]);
 
   return useQuery<LunchMenusResult>({
     queryKey: ["lunch"],

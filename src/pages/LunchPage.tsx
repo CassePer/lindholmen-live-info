@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { useLunchMenus } from "@/hooks/use-lunch";
+import { useAppSettings } from "@/hooks/use-app-settings";
 import { SearchInput } from "@/components/SearchInput";
 import { HighlightText } from "@/components/HighlightText";
 import { Button } from "@/components/ui/button";
@@ -111,24 +112,29 @@ function fmtStockholmHHMM(d: Date) {
 
 function getRefreshState(
   updatedAt: string | undefined,
-  now: Date = new Date()
+  now: Date = new Date(),
+  windowStart = 6,
+  windowEnd = 14,
 ): { allowed: boolean; reason?: string; nextLabel?: string } {
   const { weekday, hour } = stockholmParts(now);
   const isWeekday = SE_WEEKDAYS.includes(weekday);
-  const inWindow = isWeekday && hour >= 8 && hour < 14;
+  const inWindow = isWeekday && hour >= windowStart && hour < windowEnd;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const startLabel = `${pad(windowStart)}:00`;
 
   if (!inWindow) {
     let nextLabel: string;
     if (!isWeekday) {
-      nextLabel = "Öppnar måndag kl 08:00";
-    } else if (hour < 8) {
-      nextLabel = "Öppnar idag kl 08:00";
+      nextLabel = `Öppnar måndag kl ${startLabel}`;
+    } else if (hour < windowStart) {
+      nextLabel = `Öppnar idag kl ${startLabel}`;
     } else {
-      nextLabel = weekday === "fre" ? "Öppnar måndag kl 08:00" : "Öppnar imorgon kl 08:00";
+      nextLabel =
+        weekday === "fre" ? `Öppnar måndag kl ${startLabel}` : `Öppnar imorgon kl ${startLabel}`;
     }
     return {
       allowed: false,
-      reason: "Hämtning är endast tillåten vardagar kl 08–14.",
+      reason: `Hämtning är endast tillåten vardagar kl ${pad(windowStart)}–${pad(windowEnd)}.`,
       nextLabel,
     };
   }
@@ -136,12 +142,13 @@ function getRefreshState(
   const cooldownEnd = updatedAt ? new Date(new Date(updatedAt).getTime() + 60 * 60 * 1000) : null;
   if (cooldownEnd && cooldownEnd > now) {
     const cd = stockholmParts(cooldownEnd);
-    const cdInWindow = SE_WEEKDAYS.includes(cd.weekday) && cd.hour >= 8 && cd.hour < 14;
+    const cdInWindow =
+      SE_WEEKDAYS.includes(cd.weekday) && cd.hour >= windowStart && cd.hour < windowEnd;
     const nextLabel = cdInWindow
       ? `Nästa uppdatering kl ${fmtStockholmHHMM(cooldownEnd)}`
       : weekday === "fre"
-      ? "Nästa uppdatering måndag kl 08:00"
-      : "Nästa uppdatering imorgon kl 08:00";
+      ? `Nästa uppdatering måndag kl ${startLabel}`
+      : `Nästa uppdatering imorgon kl ${startLabel}`;
     return {
       allowed: false,
       reason: "Menyn uppdaterades inom senaste timmen.",
@@ -161,12 +168,31 @@ const cardVariants = {
   }),
 };
 
-function RestaurantCard({ menu, search, onRefresh, isRefreshing }: { menu: LunchMenu; search: string; onRefresh: (id: string) => void; isRefreshing: boolean }) {
+function RestaurantCard({
+  menu,
+  search,
+  onRefresh,
+  isRefreshing,
+  windowStart,
+  windowEnd,
+  hasTodaysMenu,
+  hideWhenComplete,
+}: {
+  menu: LunchMenu;
+  search: string;
+  onRefresh: (id: string) => void;
+  isRefreshing: boolean;
+  windowStart: number;
+  windowEnd: number;
+  hasTodaysMenu: boolean;
+  hideWhenComplete: boolean;
+}) {
   const mapsUrl = menu.address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(menu.address)}`
     : undefined;
-  const refreshState = getRefreshState(menu.updatedAt);
-  const refreshDisabled = !refreshState.allowed || isRefreshing;
+  const refreshState = getRefreshState(menu.updatedAt, new Date(), windowStart, windowEnd);
+  const lockedByToday = hideWhenComplete && hasTodaysMenu;
+  const refreshDisabled = !refreshState.allowed || isRefreshing || lockedByToday;
 
   return (
     <Card className="glass-card hover-scale">
@@ -192,7 +218,7 @@ function RestaurantCard({ menu, search, onRefresh, isRefreshing }: { menu: Lunch
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  onClick={() => refreshState.allowed && onRefresh(menu.restaurantId)}
+                  onClick={() => !lockedByToday && refreshState.allowed && onRefresh(menu.restaurantId)}
                   disabled={refreshDisabled}
                   className="text-muted-foreground hover:text-primary transition-colors p-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-muted-foreground"
                   aria-label={`Uppdatera ${menu.restaurantName}s meny`}
@@ -202,7 +228,9 @@ function RestaurantCard({ menu, search, onRefresh, isRefreshing }: { menu: Lunch
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="max-w-[220px] text-xs">
-                {refreshState.allowed
+                {lockedByToday
+                  ? "Dagens meny finns redan"
+                  : refreshState.allowed
                   ? "Uppdatera meny"
                   : (
                       <span className="flex flex-col gap-0.5">
@@ -261,9 +289,6 @@ function RestaurantCard({ menu, search, onRefresh, isRefreshing }: { menu: Lunch
             Ej dagens meny – visar senast hämtade ({formatDate(menu.updatedAt)})
           </p>
         )}
-        {!refreshState.allowed && refreshState.nextLabel && (
-          <p className="text-xs text-muted-foreground/80 italic">{refreshState.nextLabel}</p>
-        )}
       </CardContent>
     </Card>
   );
@@ -273,11 +298,22 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
   const [search, setSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const { data, isLoading, error } = useLunchMenus();
+  const { data: settings } = useAppSettings();
   const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshingId, setRefreshingId] = useState<string | null>(null);
 
   const activeSearch = showSearch ? search : "";
+
+  const windowStart = (() => {
+    const n = parseInt(settings?.lunch_fetch_window_start ?? "6", 10);
+    return Number.isFinite(n) ? Math.max(0, Math.min(23, n)) : 6;
+  })();
+  const windowEnd = (() => {
+    const n = parseInt(settings?.lunch_fetch_window_end ?? "14", 10);
+    return Number.isFinite(n) ? Math.max(1, Math.min(24, n)) : 14;
+  })();
+  const hideWhenComplete = settings?.lunch_hide_refresh_when_complete !== "false";
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -326,6 +362,13 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
     m.dishes.some((d) => d.name.toLowerCase().includes(activeSearch.toLowerCase()))
   );
 
+  // A restaurant is "done for today" when the edge function returned a fresh
+  // (non-stale) menu with dishes. We rely on the server-set `stale` flag so
+  // we don't get bitten by client/server timezone drift near midnight.
+  const isTodaysMenu = (m: LunchMenu) => !m.stale && m.dishes.length > 0;
+  const allTodaysMenusPresent = menus.length > 0 && menus.every(isTodaysMenu);
+  const hideGlobalRefresh = hideWhenComplete && allTodaysMenusPresent;
+
   const content = (
     <div className={embedded ? "space-y-4" : "container max-w-lg mx-auto px-4 py-6 space-y-4"}>
       <div className="flex items-center justify-between">
@@ -346,9 +389,11 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
           <Button variant="ghost" size="icon" onClick={() => { setShowSearch((v) => !v); if (showSearch) setSearch(""); }} aria-label="Sök lunchmenyer">
             <SearchIcon className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={handleRefresh} disabled={isRefreshing} aria-label="Uppdatera lunchmenyer">
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-          </Button>
+          {!hideGlobalRefresh && (
+            <Button variant="ghost" size="icon" onClick={handleRefresh} disabled={isRefreshing} aria-label="Uppdatera lunchmenyer">
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+            </Button>
+          )}
         </motion.div>
       </div>
 
@@ -391,7 +436,16 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
                 exit={{ opacity: 0, scale: 0.95 }}
                 layout
               >
-                <RestaurantCard menu={menu} search={activeSearch} onRefresh={handleRefreshSingle} isRefreshing={refreshingId === menu.restaurantId} />
+                <RestaurantCard
+                  menu={menu}
+                  search={activeSearch}
+                  onRefresh={handleRefreshSingle}
+                  isRefreshing={refreshingId === menu.restaurantId}
+                  windowStart={windowStart}
+                  windowEnd={windowEnd}
+                  hasTodaysMenu={isTodaysMenu(menu)}
+                  hideWhenComplete={hideWhenComplete}
+                />
               </motion.div>
             ))}
           </AnimatePresence>
