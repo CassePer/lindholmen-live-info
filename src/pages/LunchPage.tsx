@@ -168,12 +168,31 @@ const cardVariants = {
   }),
 };
 
-function RestaurantCard({ menu, search, onRefresh, isRefreshing }: { menu: LunchMenu; search: string; onRefresh: (id: string) => void; isRefreshing: boolean }) {
+function RestaurantCard({
+  menu,
+  search,
+  onRefresh,
+  isRefreshing,
+  windowStart,
+  windowEnd,
+  hasTodaysMenu,
+  hideWhenComplete,
+}: {
+  menu: LunchMenu;
+  search: string;
+  onRefresh: (id: string) => void;
+  isRefreshing: boolean;
+  windowStart: number;
+  windowEnd: number;
+  hasTodaysMenu: boolean;
+  hideWhenComplete: boolean;
+}) {
   const mapsUrl = menu.address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(menu.address)}`
     : undefined;
-  const refreshState = getRefreshState(menu.updatedAt);
-  const refreshDisabled = !refreshState.allowed || isRefreshing;
+  const refreshState = getRefreshState(menu.updatedAt, new Date(), windowStart, windowEnd);
+  const lockedByToday = hideWhenComplete && hasTodaysMenu;
+  const refreshDisabled = !refreshState.allowed || isRefreshing || lockedByToday;
 
   return (
     <Card className="glass-card hover-scale">
@@ -199,7 +218,7 @@ function RestaurantCard({ menu, search, onRefresh, isRefreshing }: { menu: Lunch
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  onClick={() => refreshState.allowed && onRefresh(menu.restaurantId)}
+                  onClick={() => !lockedByToday && refreshState.allowed && onRefresh(menu.restaurantId)}
                   disabled={refreshDisabled}
                   className="text-muted-foreground hover:text-primary transition-colors p-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-muted-foreground"
                   aria-label={`Uppdatera ${menu.restaurantName}s meny`}
@@ -209,7 +228,9 @@ function RestaurantCard({ menu, search, onRefresh, isRefreshing }: { menu: Lunch
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="max-w-[220px] text-xs">
-                {refreshState.allowed
+                {lockedByToday
+                  ? "Dagens meny finns redan"
+                  : refreshState.allowed
                   ? "Uppdatera meny"
                   : (
                       <span className="flex flex-col gap-0.5">
@@ -267,9 +288,6 @@ function RestaurantCard({ menu, search, onRefresh, isRefreshing }: { menu: Lunch
           <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
             Ej dagens meny – visar senast hämtade ({formatDate(menu.updatedAt)})
           </p>
-        )}
-        {!refreshState.allowed && refreshState.nextLabel && (
-          <p className="text-xs text-muted-foreground/80 italic">{refreshState.nextLabel}</p>
         )}
       </CardContent>
     </Card>
