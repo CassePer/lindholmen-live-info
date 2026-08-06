@@ -1,58 +1,25 @@
-## Mål
+# Plan: Endast innevarande veckas meny för Pier 11
 
-Gör lunchmenyernas tider konfigurerbara i Admin, dölj/inaktivera uppdateringsknappar när dagens meny redan finns, och rensa bort onödig "Nästa uppdatering"-text.
+## Problem
+Pier 11:s sida (Nordrest) visar flera veckor samtidigt — innevarande vecka och nästa vecka — där båda har rubriker för samma veckodagar. AI-extraheringen letar bara efter rubriken för dagens veckodag och plockar därför träffar från båda veckorna, så "Dagens lunch" blir dubbel.
 
-## Nya inställningar i Admin (`app_settings`)
+Extraheringsprompten i `supabase/functions/lunch-menus/index.ts` innehåller idag inga regler för vecka eller datum — bara veckodag. Det är orsaken.
 
-- `lunch_auto_refresh_time` — HH:MM (default `00:01`). När appen automatiskt växlar/hämtar dagens meny. Ersätter dagens `lunch_auto_refresh_hour`.
-- `lunch_fetch_window_start` — heltal 0–23 (**default `6`**). Tidigaste tid uppdateringar tillåts.
-- `lunch_fetch_window_end` — heltal 0–23 (default `14`, exklusivt). Senaste tid uppdateringar tillåts.
-- `lunch_hide_refresh_when_complete` — bool (default `true`). Styr beteendet när dagens meny finns för alla restauranger.
+## Åtgärd
 
-## Admin-UI (`src/pages/AdminPage.tsx`)
+### 1. Veckoscoping i prompten (daglig extrahering)
+- Beräkna ISO-veckonummer och veckans datumintervall (måndag–söndag) för idag, i Europe/Stockholm.
+- Lägg till nya regler i prompten:
+  - Om texten innehåller flera vecko-sektioner ("Vecka 32", "Vecka 33", "Nästa vecka", datumintervall) → använd ENDAST sektionen för vecka N (aktuellt nummer) eller den som innehåller dagens datum.
+  - Ignorera helt allt under andra vecko-rubriker, även om veckodagen matchar.
+  - Om exakt datum finns vid dagens veckodag, matcha på datumet i första hand, veckodagen i andra hand.
+- Samma regel läggs till i veckomeny-prompten (`buildWeeklyPrompt`) så veckomeny-restauranger bara läser innevarande vecka.
 
-Under "Lunch – automatisk uppdatering":
+### 2. Dedupe som skyddsnät
+- Efter extrahering: filtrera bort dubbletter (normaliserat namn: gemener, trimmad whitespace/skiljetecken) innan menyn cachas. Behåll första förekomsten och ordningen.
 
-- Byt heltalsfältet för timme → tidsfält (`type="time"`, HH:MM) med default `00:01`. Migrera värde: om bara `lunch_auto_refresh_hour` finns, tolka som `HH:00`.
-- Två nya heltalsfält bredvid varandra: "Uppdatering tillåten från kl" (default 6) och "till kl" (default 14), 0–23.
-- Checkbox: "Dölj/inaktivera uppdateringsknappar när dagens meny redan finns" (Label + Checkbox i samma stil som helg-checkboxarna).
-- Hjälptext: `00:01` = rullar över dygnet; knappar återkommer/återaktiveras när meny saknas eller är stale.
+### 3. Verifiering
+- Tvinga en ny hämtning för Pier 11 via edge-funktionen och kontrollera i loggarna/resultatet att antalet rätter halveras och inte innehåller nästa veckas rätter.
 
-## Auto-refresh i klienten (`src/hooks/use-lunch.ts`)
-
-- Läs `lunch_auto_refresh_time` (HH:MM). Fallback: om bara `lunch_auto_refresh_hour` finns, använd `HH:00`; annars `00:01`.
-- Schemalägg nästa körning till angiven tid; respekterar redan `lunch_update_weekends`.
-
-## Fetch-fönstret
-
-**Edge function `supabase/functions/lunch-menus/index.ts`** — `isWithinFetchWindow` slås om från hårdkodat `8–14` till att läsa `lunch_fetch_window_start`/`_end` från `app_settings` (fallback 6/14). Funktionen görs `async` och settings hämtas en gång per request. Sv-SE felmeddelande använder de dynamiska värdena.
-
-**Klient `src/pages/LunchPage.tsx`** — `getRefreshState` tar `windowStart`/`windowEnd` som argument (default 6/14); komponenten läser dem från `useAppSettings` och skickar in. Meddelandet "Öppnar kl HH:00" använder start-timmen.
-
-## Dölj/inaktivera uppdateringsknappar (`LunchPage.tsx`)
-
-- Härled `todayKey` (Europe/Stockholm YYYY-MM-DD).
-- `allTodaysMenusPresent = menus.length > 0 && menus.every(m => m.date === todayKey && !m.stale && m.dishes.length > 0)`.
-- När `lunch_hide_refresh_when_complete === "true"` och `allTodaysMenusPresent`:
-  - **Dölj** den globala "uppdatera alla"-knappen i headern.
-  - **Per restaurang**: om restaurangens egen meny är dagens (`m.date === todayKey && !m.stale && m.dishes.length > 0`), **inaktivera** dess refresh-knapp (disabled + tooltip "Dagens meny finns redan"). Övriga (saknade/stale) restauranger behåller aktiv knapp.
-- Om någon meny saknas/är stale visas globala knappen fortfarande.
-
-## Ta bort "Nästa uppdatering kl xx:xx"
-
-- I `RestaurantCard`: ta bort raden `{!refreshState.allowed && refreshState.nextLabel && <p ...>{refreshState.nextLabel}</p>}` (den under uppdaterad-tiden).
-- Motsvarande text finns kvar i tooltip vid hover — den behålls, men syns inte längre statiskt under menyn.
-
-## Bakåtkompatibilitet
-
-- Cache-fallback (`fillMissingFromYesterday`) behåller gårdagens meny om dagens saknas — inget nytt behövs.
-- Gamla `lunch_auto_refresh_hour` läses som fallback tills `lunch_auto_refresh_time` sätts.
-
-## Filer som ändras
-
-- `src/pages/AdminPage.tsx` — nya kontroller, ny default 6.
-- `src/hooks/use-lunch.ts` — HH:MM-tid.
-- `src/pages/LunchPage.tsx` — läs fönster + göm/inaktivera, ta bort "Nästa uppdatering"-raden.
-- `supabase/functions/lunch-menus/index.ts` — dynamiskt fetch-fönster (default 6–14).
-
-Inga schemaändringar.
+## Teknisk detalj
+Alla ändringar sker i `supabase/functions/lunch-menus/index.ts`: hjälpfunktion för ISO-vecka + veckans datumintervall, utökad `buildPrompt`/`buildWeeklyPrompt`, samt en `dedupeDishes`-funktion som körs på resultatet från `extractMenuFromText`. Inga schemaändringar och inga frontend-ändringar.
