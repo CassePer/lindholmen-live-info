@@ -856,6 +856,11 @@ Deno.serve(async (req) => {
             let byDay: Record<string, { name: string; tags?: string[] }[]> | null = null;
             if (markdown && markdown.length >= MIN_MARKDOWN_LENGTH) {
               byDay = await extractWeeklyMenuFromText(r.name, markdown, lovableKey, todayKey);
+              if (byDay) {
+                for (const k of Object.keys(byDay)) {
+                  byDay[k] = dedupeDishes(byDay[k] ?? []);
+                }
+              }
             }
             if (!byDay || !weeklyHasAnyDishes(byDay)) {
               // Fallback: keep previously known menu (today's view) for this restaurant
