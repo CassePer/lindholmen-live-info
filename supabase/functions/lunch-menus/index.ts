@@ -141,6 +141,7 @@ function buildPrompt(name: string, todayStr: string): string {
   return `Du är en menyextraherare. Extrahera ALLA rätter som listas på menyn (huvudrätter, soppor, tillbehör, desserter, efterrätter etc.) som serveras IDAG (${todayDay} ${todayStr}) från innehållet för restaurangen "${name}".
 
 IDAG ÄR: ${todayDay} (förkortat: ${todayAbbrev})
+${buildWeekScopeRules(todayStr)}
 
 REGLER – läs ALLA innan du börjar:
 
@@ -223,7 +224,7 @@ ${markdown.slice(0, 15000)}`;
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return [];
     const parsed = JSON.parse(jsonMatch[0]);
-    return parsed.dishes || [];
+    return dedupeDishes(parsed.dishes || []);
   } catch (err) {
     console.error(`AI text extraction error for ${name}:`, err);
     return [];
@@ -295,7 +296,7 @@ async function extractMenuFromScreenshot(
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return [];
     const parsed = JSON.parse(jsonMatch[0]);
-    return parsed.dishes || [];
+    return dedupeDishes(parsed.dishes || []);
   } catch (err) {
     console.error(`AI vision extraction error for ${name}:`, err);
     return [];
@@ -304,8 +305,57 @@ async function extractMenuFromScreenshot(
 
 const MIN_MARKDOWN_LENGTH = 200;
 
-function buildWeekPrompt(name: string): string {
+/** ISO week number for a date. */
+function isoWeekNumber(date: Date): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+}
+
+/** Rules that force the model to only read the CURRENT week's section. */
+function buildWeekScopeRules(todayStr: string): string {
+  const today = new Date(todayStr);
+  const week = isoWeekNumber(today);
+  const monday = new Date(today);
+  const day = monday.getDay();
+  monday.setDate(monday.getDate() + (day === 0 ? -6 : 1 - day));
+  const sunday = new Date(monday);
+  sunday.setDate(sunday.getDate() + 6);
+  const fmt = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  return `
+AKTUELL VECKA: vecka ${week} (${fmt(monday)} – ${fmt(sunday)}). Dagens datum är ${todayStr}.
+
+VECKOSCOPING – VIKTIGAST AV ALLT:
+- Sidan kan innehålla FLERA veckor samtidigt (t.ex. "Vecka ${week}" och "Vecka ${week + 1}", "Nästa vecka", eller datumintervall/flikar).
+- Använd ENDAST innehållet i sektionen för vecka ${week} eller den sektion vars datumintervall innehåller ${todayStr}.
+- Allt under andra vecko-rubriker ska IGNORERAS HELT, även om veckodagen matchar dagens veckodag.
+- Står ett exakt datum vid veckodagen: matcha i första hand på datumet ${todayStr}, i andra hand på veckodagens namn.
+- Varje rätt får bara förekomma EN gång i svaret – inga dubbletter.`;
+}
+
+/** Remove duplicate dishes (case/whitespace/punctuation-insensitive), keeping order. */
+function dedupeDishes<T extends { name?: string }>(dishes: T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const d of dishes ?? []) {
+    const key = (d?.name ?? '')
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, ' ')
+      .trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(d);
+  }
+  return out;
+}
+
+function buildWeekPrompt(name: string, todayStr: string): string {
   return `Du är en menyextraherare. Restaurangen "${name}" publicerar HELA veckans meny på måndagen. Extrahera ALLA rätter strukturerat per veckodag (mån–fre).
+${buildWeekScopeRules(todayStr)}
 
 Svara ENBART med giltig JSON (inga kommentarer, ingen markdown), exakt detta schema:
 {
@@ -333,9 +383,10 @@ Taggar (bara om det TYDLIGT framgår): "vegetarisk", "vegansk", "fisk", "kött".
 async function extractWeeklyMenuFromText(
   name: string,
   markdown: string,
-  apiKey: string
+  apiKey: string,
+  todayStr: string
 ): Promise<Record<string, { name: string; tags?: string[] }[]> | null> {
-  const prompt = buildWeekPrompt(name) + `\n\nText att analysera:\n${markdown.slice(0, 18000)}`;
+  const prompt = buildWeekPrompt(name, todayStr) + `\n\nText att analysera:\n${markdown.slice(0, 18000)}`;
   try {
     const res = await fetch(AI_GATEWAY, {
       method: 'POST',
@@ -804,7 +855,12 @@ Deno.serve(async (req) => {
             const { markdown } = await scrapeUrl(r.menu_url, firecrawlKey);
             let byDay: Record<string, { name: string; tags?: string[] }[]> | null = null;
             if (markdown && markdown.length >= MIN_MARKDOWN_LENGTH) {
-              byDay = await extractWeeklyMenuFromText(r.name, markdown, lovableKey);
+              byDay = await extractWeeklyMenuFromText(r.name, markdown, lovableKey, todayKey);
+              if (byDay) {
+                for (const k of Object.keys(byDay)) {
+                  byDay[k] = dedupeDishes(byDay[k] ?? []);
+                }
+              }
             }
             if (!byDay || !weeklyHasAnyDishes(byDay)) {
               // Fallback: keep previously known menu (today's view) for this restaurant
