@@ -224,7 +224,7 @@ ${markdown.slice(0, 15000)}`;
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return [];
     const parsed = JSON.parse(jsonMatch[0]);
-    return parsed.dishes || [];
+    return dedupeDishes(parsed.dishes || []);
   } catch (err) {
     console.error(`AI text extraction error for ${name}:`, err);
     return [];
@@ -296,7 +296,7 @@ async function extractMenuFromScreenshot(
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return [];
     const parsed = JSON.parse(jsonMatch[0]);
-    return parsed.dishes || [];
+    return dedupeDishes(parsed.dishes || []);
   } catch (err) {
     console.error(`AI vision extraction error for ${name}:`, err);
     return [];
@@ -855,7 +855,7 @@ Deno.serve(async (req) => {
             const { markdown } = await scrapeUrl(r.menu_url, firecrawlKey);
             let byDay: Record<string, { name: string; tags?: string[] }[]> | null = null;
             if (markdown && markdown.length >= MIN_MARKDOWN_LENGTH) {
-              byDay = await extractWeeklyMenuFromText(r.name, markdown, lovableKey);
+              byDay = await extractWeeklyMenuFromText(r.name, markdown, lovableKey, todayKey);
             }
             if (!byDay || !weeklyHasAnyDishes(byDay)) {
               // Fallback: keep previously known menu (today's view) for this restaurant
