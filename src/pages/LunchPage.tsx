@@ -14,6 +14,30 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { LunchMenu, DietTag } from "@/api/types";
 
+const DAY_LABELS: Record<string, string> = {
+  mon: "Mån",
+  tue: "Tis",
+  wed: "Ons",
+  thu: "Tors",
+  fri: "Fre",
+};
+
+/** Today's date (YYYY-MM-DD) in Europe/Stockholm. */
+function stockholmDateKey(d: Date = new Date()) {
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Stockholm",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+function shortDayDate(iso: string) {
+  const d = new Date(`${iso}T12:00:00`);
+  if (isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("sv-SE", { day: "numeric", month: "numeric" }).format(d);
+}
+
 const TAG_LABELS: Record<DietTag, string> = {
   vegetarisk: "Vegetarisk",
   vegansk: "Vegansk",
