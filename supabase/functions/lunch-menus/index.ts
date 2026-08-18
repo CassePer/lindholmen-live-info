@@ -165,7 +165,7 @@ async function scrapeUrl(url: string, firecrawlKey: string): Promise<ScrapeResul
 function buildPrompt(name: string, todayStr: string): string {
   const dayNames = ['söndag', 'måndag', 'tisdag', 'onsdag', 'torsdag', 'fredag', 'lördag'];
   const dayAbbrevs = ['sön', 'mån', 'tis', 'ons', 'tors', 'fre', 'lör'];
-  const todayIdx = new Date(todayStr).getDay();
+  const todayIdx = anchorFromKey(todayStr).getUTCDay();
   const todayDay = dayNames[todayIdx];
   const todayAbbrev = dayAbbrevs[todayIdx];
 
@@ -347,15 +347,14 @@ function isoWeekNumber(date: Date): number {
 
 /** Rules that force the model to only read the CURRENT week's section. */
 function buildWeekScopeRules(todayStr: string): string {
-  const today = new Date(todayStr);
+  const today = anchorFromKey(todayStr);
   const week = isoWeekNumber(today);
-  const monday = new Date(today);
-  const day = monday.getDay();
-  monday.setDate(monday.getDate() + (day === 0 ? -6 : 1 - day));
-  const sunday = new Date(monday);
-  sunday.setDate(sunday.getDate() + 6);
-  const fmt = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const day = today.getUTCDay();
+  const mondayStr = shiftKey(todayStr, day === 0 ? -6 : 1 - day);
+  const sundayStr = shiftKey(mondayStr, 6);
+  const fmt = (s: string) => s;
+  const monday = mondayStr;
+  const sunday = sundayStr;
 
   return `
 AKTUELL VECKA: vecka ${week} (${fmt(monday)} – ${fmt(sunday)}). Dagens datum är ${todayStr}.
