@@ -254,7 +254,9 @@ function RestaurantCard({
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="max-w-[220px] text-xs">
-                {lockedByToday
+                {!isToday
+                  ? "Uppdatering endast möjlig för dagens datum"
+                  : lockedByToday
                   ? "Dagens meny finns redan"
                   : refreshState.allowed
                   ? "Uppdatera meny"
