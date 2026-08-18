@@ -589,21 +589,29 @@ Deno.serve(async (req) => {
     const mondayKey = mondayKeyOf(now);
     const cacheKeys = Array.from(new Set([todayKey, mondayKey]));
 
-    // Load configurable fetch-window bounds from app_settings (fallback 6–14).
+    // Load configurable fetch-window bounds from app_settings.
+    // Empty values or start === end means "no window restriction" (all day, weekdays only unless weekends enabled).
     let windowStart = 6;
     let windowEnd = 14;
+    let windowDisabled = false;
     try {
       const { data: settingsRows } = await supabase
         .from('app_settings')
         .select('key, value')
         .in('key', ['lunch_fetch_window_start', 'lunch_fetch_window_end']);
-      for (const row of (settingsRows ?? []) as any[]) {
-        const n = parseInt(row.value, 10);
-        if (!Number.isFinite(n)) continue;
-        if (row.key === 'lunch_fetch_window_start') windowStart = Math.max(0, Math.min(23, n));
-        if (row.key === 'lunch_fetch_window_end') windowEnd = Math.max(1, Math.min(24, n));
+      const startRaw = String(settingsRows?.find((r: any) => r.key === 'lunch_fetch_window_start')?.value ?? '').trim();
+      const endRaw = String(settingsRows?.find((r: any) => r.key === 'lunch_fetch_window_end')?.value ?? '').trim();
+      if (startRaw === '' || endRaw === '' || startRaw === endRaw) {
+        windowDisabled = true;
+      } else {
+        const startNum = parseInt(startRaw, 10);
+        const endNum = parseInt(endRaw, 10);
+        if (Number.isFinite(startNum) && Number.isFinite(endNum)) {
+          windowStart = Math.max(0, Math.min(23, startNum));
+          windowEnd = Math.max(1, Math.min(24, endNum));
+          if (windowEnd <= windowStart) windowEnd = Math.min(24, windowStart + 1);
+        }
       }
-      if (windowEnd <= windowStart) windowEnd = Math.min(24, windowStart + 1);
     } catch { /* keep defaults */ }
 
     // Normalize a cache row's menu_data: weekly rows are projected to today's view.
