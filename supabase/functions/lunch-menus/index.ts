@@ -44,9 +44,8 @@ interface WeeklyMenuRaw {
   updatedAt: string;
 }
 
-/** Convert a weekly cached menu into the normal "today" menu shape used by the UI. */
-function weeklyToTodayMenu(raw: WeeklyMenuRaw, now: Date, todayKey: string) {
-  const dk = todayDayKey(now);
+/** Convert a weekly cached menu into the normal single-day menu shape used by the UI. */
+function weeklyToDayMenu(raw: WeeklyMenuRaw, dk: DayKey, dateKey: string) {
   const byDay = raw?.dishesByDay ?? {};
   const todays = Array.isArray(byDay[dk]) ? byDay[dk]! : [];
   const weekList = Array.isArray(byDay.week) ? byDay.week! : [];
@@ -59,12 +58,17 @@ function weeklyToTodayMenu(raw: WeeklyMenuRaw, now: Date, todayKey: string) {
     restaurantName: raw.restaurantName,
     websiteUrl: raw.websiteUrl,
     sourceUrl: raw.sourceUrl,
-    date: todayKey,
+    date: dateKey,
     dishes: [...todays, ...weekPrefixed],
     updatedAt: raw.updatedAt,
     weekly: true,
     weekStart: raw.weekStart,
   };
+}
+
+/** Today's projection of a weekly menu. */
+function weeklyToTodayMenu(raw: WeeklyMenuRaw, now: Date, todayKey: string) {
+  return weeklyToDayMenu(raw, todayDayKey(now), todayKey);
 }
 
 /** Check if current time (Europe/Stockholm) is within allowed fetch window:
