@@ -436,7 +436,22 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
     }
   };
 
-  const menus = data?.menus ?? [];
+  const todayKey = stockholmDateKey();
+  const week = data?.week;
+  const weekDays = week?.days ?? [];
+  // Default to today; on weekends (today not in the Mon–Fri list) pick Monday.
+  const effectiveDate =
+    selectedDate && weekDays.some((d) => d.date === selectedDate)
+      ? selectedDate
+      : weekDays.some((d) => d.date === todayKey)
+      ? todayKey
+      : weekDays[0]?.date ?? todayKey;
+  const isToday = effectiveDate === todayKey;
+
+  const todaysMenus = data?.menus ?? [];
+  const menus = !week || isToday
+    ? todaysMenus
+    : weekDays.find((d) => d.date === effectiveDate)?.menus ?? [];
   const aiCreditsExhausted = data?.aiCreditsExhausted ?? false;
   const filtered = menus.filter((m) =>
     m.restaurantName.toLowerCase().includes(activeSearch.toLowerCase()) ||
@@ -447,8 +462,8 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
   // (non-stale) menu with dishes. We rely on the server-set `stale` flag so
   // we don't get bitten by client/server timezone drift near midnight.
   const isTodaysMenu = (m: LunchMenu) => !m.stale && m.dishes.length > 0;
-  const allTodaysMenusPresent = menus.length > 0 && menus.every(isTodaysMenu);
-  const hideGlobalRefresh = hideWhenComplete && allTodaysMenusPresent;
+  const allTodaysMenusPresent = todaysMenus.length > 0 && todaysMenus.every(isTodaysMenu);
+  const hideGlobalRefresh = !isToday || (hideWhenComplete && allTodaysMenusPresent);
 
   const content = (
     <div className={embedded ? "space-y-4" : "container max-w-lg mx-auto px-4 py-6 space-y-4"}>
