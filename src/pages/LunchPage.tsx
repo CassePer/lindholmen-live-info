@@ -218,7 +218,7 @@ function RestaurantCard({
     : undefined;
   const refreshState = getRefreshState(menu.updatedAt, new Date(), windowStart, windowEnd);
   const lockedByToday = hideWhenComplete && hasTodaysMenu;
-  const refreshDisabled = !refreshState.allowed || isRefreshing || lockedByToday;
+  const refreshDisabled = !isToday || !refreshState.allowed || isRefreshing || lockedByToday;
 
   return (
     <Card className="glass-card hover-scale">
@@ -244,7 +244,7 @@ function RestaurantCard({
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  onClick={() => !lockedByToday && refreshState.allowed && onRefresh(menu.restaurantId)}
+                  onClick={() => !refreshDisabled && onRefresh(menu.restaurantId)}
                   disabled={refreshDisabled}
                   className="text-muted-foreground hover:text-primary transition-colors p-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-muted-foreground"
                   aria-label={`Uppdatera ${menu.restaurantName}s meny`}
@@ -484,8 +484,10 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
   // (non-stale) menu with dishes. We rely on the server-set `stale` flag so
   // we don't get bitten by client/server timezone drift near midnight.
   const isTodaysMenu = (m: LunchMenu) => !m.stale && m.dishes.length > 0;
-  const allTodaysMenusPresent = todaysMenus.length > 0 && todaysMenus.every(isTodaysMenu);
-  const hideGlobalRefresh = !isToday || (hideWhenComplete && allTodaysMenusPresent);
+  // Completeness is evaluated for the currently selected day, not only today.
+  const hasDayMenu = (m: LunchMenu) => (isToday ? !m.stale && m.dishes.length > 0 : m.dishes.length > 0);
+  const allDayMenusPresent = menus.length > 0 && menus.every(hasDayMenu);
+  const hideGlobalRefresh = !isToday || (hideWhenComplete && allDayMenusPresent);
 
   const content = (
     <div className={embedded ? "space-y-4" : "container max-w-lg mx-auto px-4 py-6 space-y-4"}>
@@ -589,8 +591,8 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
                   isRefreshing={refreshingId === menu.restaurantId}
                   windowStart={windowStart}
                   windowEnd={windowEnd}
-                  hasTodaysMenu={!isToday ? true : isTodaysMenu(menu)}
-                  hideWhenComplete={!isToday ? true : hideWhenComplete}
+                  hasTodaysMenu={hasDayMenu(menu)}
+                  hideWhenComplete={hideWhenComplete}
                   isToday={isToday}
                 />
               </motion.div>
