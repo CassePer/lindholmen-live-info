@@ -240,6 +240,7 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
   const currentLunchWindowStart = lunchWindowStart ?? settings?.lunch_fetch_window_start ?? "6";
   const currentLunchWindowEnd = lunchWindowEnd ?? settings?.lunch_fetch_window_end ?? "14";
   const hideRefreshWhenComplete = settings?.lunch_hide_refresh_when_complete !== "false";
+  const weekViewEnabled = settings?.lunch_week_view_enabled !== "false";
   const currentStopBus = stopBus ?? settings?.departure_stop_bus ?? "740059410";
   const currentStopTram = stopTram ?? settings?.departure_stop_tram ?? "740059410";
   const currentStopFerry = stopFerry ?? settings?.departure_stop_ferry ?? "740059412";
@@ -383,6 +384,18 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
               />
               <Label htmlFor="hide-refresh-when-complete">
                 Dölj/inaktivera uppdateringsknappar när dagens meny finns
+              </Label>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <Checkbox
+                id="lunch-week-view"
+                checked={weekViewEnabled}
+                onCheckedChange={(v) =>
+                  saveSettingMutation.mutate({ key: "lunch_week_view_enabled", value: String(v) })
+                }
+              />
+              <Label htmlFor="lunch-week-view">
+                Visa dagväljare (Mån–Fre) på lunchsidan
               </Label>
             </div>
             <div className="border-t pt-3 mt-3">
