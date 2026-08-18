@@ -77,6 +77,7 @@ function isWithinFetchWindow(
   date: Date,
   startHour = 6,
   endHour = 14,
+  windowDisabled = false,
 ): { allowed: boolean; reason?: string } {
   const parts = new Intl.DateTimeFormat('sv-SE', {
     timeZone: 'Europe/Stockholm',
@@ -90,7 +91,7 @@ function isWithinFetchWindow(
   // sv-SE short weekday: mån, tis, ons, tors, fre, lör, sön
   const isWeekday = ['mån', 'tis', 'ons', 'tors', 'fre'].includes(weekday);
   if (!isWeekday) return { allowed: false, reason: 'Hämtning av menyer är endast tillåten på vardagar (mån–fre).' };
-  if (hour < startHour || hour >= endHour) {
+  if (!windowDisabled && (hour < startHour || hour >= endHour)) {
     const pad = (n: number) => String(n).padStart(2, '0');
     return {
       allowed: false,
@@ -588,21 +589,29 @@ Deno.serve(async (req) => {
     const mondayKey = mondayKeyOf(now);
     const cacheKeys = Array.from(new Set([todayKey, mondayKey]));
 
-    // Load configurable fetch-window bounds from app_settings (fallback 6–14).
+    // Load configurable fetch-window bounds from app_settings.
+    // Empty values or start === end means "no window restriction" (all day, weekdays only unless weekends enabled).
     let windowStart = 6;
     let windowEnd = 14;
+    let windowDisabled = false;
     try {
       const { data: settingsRows } = await supabase
         .from('app_settings')
         .select('key, value')
         .in('key', ['lunch_fetch_window_start', 'lunch_fetch_window_end']);
-      for (const row of (settingsRows ?? []) as any[]) {
-        const n = parseInt(row.value, 10);
-        if (!Number.isFinite(n)) continue;
-        if (row.key === 'lunch_fetch_window_start') windowStart = Math.max(0, Math.min(23, n));
-        if (row.key === 'lunch_fetch_window_end') windowEnd = Math.max(1, Math.min(24, n));
+      const startRaw = String(settingsRows?.find((r: any) => r.key === 'lunch_fetch_window_start')?.value ?? '').trim();
+      const endRaw = String(settingsRows?.find((r: any) => r.key === 'lunch_fetch_window_end')?.value ?? '').trim();
+      if (startRaw === '' || endRaw === '' || startRaw === endRaw) {
+        windowDisabled = true;
+      } else {
+        const startNum = parseInt(startRaw, 10);
+        const endNum = parseInt(endRaw, 10);
+        if (Number.isFinite(startNum) && Number.isFinite(endNum)) {
+          windowStart = Math.max(0, Math.min(23, startNum));
+          windowEnd = Math.max(1, Math.min(24, endNum));
+          if (windowEnd <= windowStart) windowEnd = Math.min(24, windowStart + 1);
+        }
       }
-      if (windowEnd <= windowStart) windowEnd = Math.min(24, windowStart + 1);
     } catch { /* keep defaults */ }
 
     // Normalize a cache row's menu_data: weekly rows are projected to today's view.
@@ -740,7 +749,7 @@ Deno.serve(async (req) => {
       // Single restaurant refresh — bypass cooldown, re-scrape only one
       if (singleRestaurantId) {
         // Window check: only allow scraping on weekdays 08–14
-        const window = isWithinFetchWindow(now, windowStart, windowEnd);
+        const window = isWithinFetchWindow(now, windowStart, windowEnd, windowDisabled);
         if (!window.allowed) {
           console.log(`Single refresh blocked – outside fetch window: ${window.reason}`);
           const menus = sortByName((await fillMissingFromYesterday(cached.map((row: any) => normalizeMenuData(row.menu_data)))).map((m: any) => ({ ...m, stale: m?.date !== todayKey })));
@@ -767,7 +776,7 @@ Deno.serve(async (req) => {
         console.log(`Single restaurant refresh for ${singleRestaurantId}`);
       } else if (force) {
         // Window check: only allow scraping on weekdays 08–14
-        const window = isWithinFetchWindow(now, windowStart, windowEnd);
+        const window = isWithinFetchWindow(now, windowStart, windowEnd, windowDisabled);
         if (!window.allowed) {
           console.log(`Force refresh blocked – outside fetch window: ${window.reason}`);
           const menus = sortByName((await fillMissingFromYesterday(cached.map((row: any) => normalizeMenuData(row.menu_data)))).map((m: any) => ({ ...m, stale: m?.date !== todayKey })));
@@ -805,7 +814,7 @@ Deno.serve(async (req) => {
       }
     } else if (force || singleRestaurantId) {
       // No cache yet — still enforce window for any scrape attempt
-      const window = isWithinFetchWindow(now, windowStart, windowEnd);
+      const window = isWithinFetchWindow(now, windowStart, windowEnd, windowDisabled);
       if (!window.allowed) {
         console.log(`Refresh blocked – outside fetch window: ${window.reason}`);
         return new Response(
@@ -816,7 +825,7 @@ Deno.serve(async (req) => {
       console.log(`Force refresh – no existing cache to check cooldown against`);
     } else {
       // Normal request with no cache: only scrape inside the fetch window
-      const window = isWithinFetchWindow(now, windowStart, windowEnd);
+      const window = isWithinFetchWindow(now, windowStart, windowEnd, windowDisabled);
       if (!window.allowed) {
         console.log(`Initial scrape blocked – outside fetch window: ${window.reason}`);
         return new Response(

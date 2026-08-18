@@ -340,7 +340,7 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
               <p className="text-xs text-muted-foreground mt-1">Vid denna tid varje dag växlar appen till dagens meny (t.ex. 00:01 = strax efter midnatt).</p>
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Lunch – tillåtet uppdateringsfönster (timme, 0–23)</label>
+              <label className="text-sm font-medium mb-1 block">Lunch – tillåtet uppdateringsfönster (timmar, valfritt)</label>
               <div className="flex items-center gap-2">
                 <Input
                   type="number"
@@ -354,7 +354,7 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
                 <span className="text-sm text-muted-foreground">till</span>
                 <Input
                   type="number"
-                  min="1"
+                  min="0"
                   max="24"
                   value={currentLunchWindowEnd}
                   onChange={(e) => setLunchWindowEnd(e.target.value)}
@@ -371,8 +371,13 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
                 >
                   Spara
                 </Button>
+                {(currentLunchWindowStart === "" || currentLunchWindowEnd === "" || currentLunchWindowStart === currentLunchWindowEnd) && (
+                  <span className="text-xs font-medium text-primary">Dygnet runt</span>
+                )}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Manuella och automatiska hämtningar tillåts endast inom detta intervall (vardagar).</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Lämna fälten tomma eller ange samma start- och sluttid för att tillåta hämtning dygnet runt. Annars tillåts hämtning inom intervallet (vardagar).
+              </p>
             </div>
             <div className="flex items-center gap-2 pt-1">
               <Checkbox
