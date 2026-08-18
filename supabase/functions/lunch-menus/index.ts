@@ -11,26 +11,52 @@ const AI_GATEWAY = 'https://ai.gateway.lovable.dev/v1/chat/completions';
 // Per-request flag: set to true when AI Gateway returns 402 (credits exhausted)
 let aiCreditsExhausted = false;
 
+/** Date key (YYYY-MM-DD) for the given instant in Europe/Stockholm.
+ *  The Deno runtime is UTC, so plain local getters would be up to 2h behind
+ *  and roll the day over too late (menus landing on the wrong weekday). */
 function getTodayKey(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  // sv-SE formats as YYYY-MM-DD
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Europe/Stockholm',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+/** Stable UTC-noon anchor for a date key, safe for +/- day arithmetic. */
+function anchorFromKey(key: string): Date {
+  return new Date(`${key}T12:00:00Z`);
+}
+
+/** Stockholm-anchored copy of an instant; UTC getters on it match Stockholm's date. */
+function stockholmAnchor(date: Date): Date {
+  return anchorFromKey(getTodayKey(date));
+}
+
+/** Weekday index (0=Sun..6=Sat) of the instant in Europe/Stockholm. */
+function stockholmDayIndex(date: Date): number {
+  return stockholmAnchor(date).getUTCDay();
+}
+
+/** Shift a date key by N days. */
+function shiftKey(key: string, days: number): string {
+  const d = anchorFromKey(key);
+  d.setUTCDate(d.getUTCDate() + days);
+  return getTodayKey(d);
 }
 
 /** Date key (YYYY-MM-DD) for the Monday of the given date's ISO week. */
 function mondayKeyOf(date: Date): string {
-  const d = new Date(date);
-  const day = d.getDay(); // 0=Sun, 1=Mon, ... 6=Sat
+  const day = stockholmDayIndex(date); // 0=Sun, 1=Mon, ... 6=Sat
   const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  return getTodayKey(d);
+  return shiftKey(getTodayKey(date), diff);
 }
 
 const DAY_KEYS_BY_INDEX = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
 type DayKey = typeof DAY_KEYS_BY_INDEX[number];
 function todayDayKey(date: Date): DayKey {
-  return DAY_KEYS_BY_INDEX[date.getDay()];
+  return DAY_KEYS_BY_INDEX[stockholmDayIndex(date)];
 }
 
 interface WeeklyMenuRaw {
@@ -139,7 +165,7 @@ async function scrapeUrl(url: string, firecrawlKey: string): Promise<ScrapeResul
 function buildPrompt(name: string, todayStr: string): string {
   const dayNames = ['söndag', 'måndag', 'tisdag', 'onsdag', 'torsdag', 'fredag', 'lördag'];
   const dayAbbrevs = ['sön', 'mån', 'tis', 'ons', 'tors', 'fre', 'lör'];
-  const todayIdx = new Date(todayStr).getDay();
+  const todayIdx = anchorFromKey(todayStr).getUTCDay();
   const todayDay = dayNames[todayIdx];
   const todayAbbrev = dayAbbrevs[todayIdx];
 
@@ -321,15 +347,14 @@ function isoWeekNumber(date: Date): number {
 
 /** Rules that force the model to only read the CURRENT week's section. */
 function buildWeekScopeRules(todayStr: string): string {
-  const today = new Date(todayStr);
+  const today = anchorFromKey(todayStr);
   const week = isoWeekNumber(today);
-  const monday = new Date(today);
-  const day = monday.getDay();
-  monday.setDate(monday.getDate() + (day === 0 ? -6 : 1 - day));
-  const sunday = new Date(monday);
-  sunday.setDate(sunday.getDate() + 6);
-  const fmt = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const day = today.getUTCDay();
+  const mondayStr = shiftKey(todayStr, day === 0 ? -6 : 1 - day);
+  const sundayStr = shiftKey(mondayStr, 6);
+  const fmt = (s: string) => s;
+  const monday = mondayStr;
+  const sunday = sundayStr;
 
   return `
 AKTUELL VECKA: vecka ${week} (${fmt(monday)} – ${fmt(sunday)}). Dagens datum är ${todayStr}.
@@ -627,9 +652,7 @@ Deno.serve(async (req) => {
     // restaurant missing from today's results, substitute yesterday's menu
     // (marked stale). Never reaches further back than 1 day.
     function yesterdayKeyOf(d: Date): string {
-      const y = new Date(d);
-      y.setDate(y.getDate() - 1);
-      return getTodayKey(y);
+      return shiftKey(getTodayKey(d), -1);
     }
     const allowedPrevDatesGlobal = new Set<string>([todayKey, yesterdayKeyOf(now)]);
 
@@ -679,14 +702,11 @@ Deno.serve(async (req) => {
 
     /** Build a Mon–Fri view of the current ISO week purely from cache. */
     async function buildWeek() {
-      const monday = new Date(now);
-      const dow = monday.getDay();
-      monday.setDate(monday.getDate() + (dow === 0 ? -6 : 1 - dow));
+      const mondayStr = mondayKeyOf(now);
       const dayDefs: { date: string; dayKey: DayKey }[] = [];
       for (let i = 0; i < 5; i++) {
-        const d = new Date(monday);
-        d.setDate(monday.getDate() + i);
-        dayDefs.push({ date: getTodayKey(d), dayKey: DAY_KEYS_BY_INDEX[d.getDay()] });
+        const date = shiftKey(mondayStr, i);
+        dayDefs.push({ date, dayKey: DAY_KEYS_BY_INDEX[anchorFromKey(date).getUTCDay()] });
       }
 
       const { data: rows } = await supabase
@@ -879,9 +899,7 @@ Deno.serve(async (req) => {
     // Only substitute from "yesterday or today" — never older. The user
     // explicitly does not want stale messages pointing to data from days ago.
     function yesterdayKey(d: Date): string {
-      const y = new Date(d);
-      y.setDate(y.getDate() - 1);
-      return getTodayKey(y);
+      return shiftKey(getTodayKey(d), -1);
     }
     const allowedPrevDates = new Set<string>([todayKey, yesterdayKey(now)]);
 
