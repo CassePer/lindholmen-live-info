@@ -668,6 +668,58 @@ Deno.serve(async (req) => {
       return [...menus, ...Array.from(latestPrev.values()), ...stubs];
     }
 
+    /** Build a Mon–Fri view of the current ISO week purely from cache. */
+    async function buildWeek() {
+      const monday = new Date(now);
+      const dow = monday.getDay();
+      monday.setDate(monday.getDate() + (dow === 0 ? -6 : 1 - dow));
+      const dayDefs: { date: string; dayKey: DayKey }[] = [];
+      for (let i = 0; i < 5; i++) {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        dayDefs.push({ date: getTodayKey(d), dayKey: DAY_KEYS_BY_INDEX[d.getDay()] });
+      }
+
+      const { data: rows } = await supabase
+        .from('lunch_menu_cache')
+        .select('menu_data, week_key')
+        .in('week_key', dayDefs.map((d) => d.date));
+
+      const { data: activeRest } = await supabase
+        .from('restaurants')
+        .select('id, name, website_url, menu_url')
+        .eq('active', true);
+
+      const weeklyRows = (rows ?? []).filter(
+        (r: any) => r.menu_data?.weekly && r.menu_data?.weekStart === dayDefs[0].date,
+      );
+
+      const days = dayDefs.map(({ date, dayKey }) => {
+        const daily = (rows ?? [])
+          .filter((r: any) => !r.menu_data?.weekly && r.week_key === date)
+          .map((r: any) => r.menu_data);
+        const weekly = weeklyRows.map((r: any) => weeklyToDayMenu(r.menu_data as WeeklyMenuRaw, dayKey, date));
+        const menus = [...daily, ...weekly];
+        const haveIds = new Set(menus.map((m: any) => m?.restaurantId));
+        const stubs = (activeRest ?? [])
+          .filter((r: any) => !haveIds.has(r.id))
+          .map((r: any) => ({
+            restaurantId: r.id,
+            restaurantName: r.name,
+            websiteUrl: r.website_url,
+            sourceUrl: r.menu_url,
+            date,
+            dishes: [],
+            updatedAt: '',
+          }));
+        return { date, dayKey, menus: sortByName([...menus, ...stubs]) };
+      });
+
+      return { weekStart: dayDefs[0].date, days };
+    }
+
+    const week = await buildWeek();
+
     // Check cache for today
     const { data: cacheRowsAll, error: cacheError } = await supabase
       .from('lunch_menu_cache')
