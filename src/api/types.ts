@@ -63,20 +63,6 @@ export interface LunchWeek {
   days: LunchDay[];
 }
 
-interface UnusedWeeklyLunchMenu {
-  restaurantId: string;
-  restaurantName: string;
-  websiteUrl: string;
-  week: string; // YYYY-WW
-  days: {
-    date: string;
-    dayName: string;
-    dishes: LunchDish[];
-  }[];
-  sourceUrl: string;
-  updatedAt: string;
-}
-
 // ── Departures ──
 
 export type TransportType = "Färja" | "Spårvagn" | "Buss" | "Tåg";
