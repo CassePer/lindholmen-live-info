@@ -749,7 +749,7 @@ Deno.serve(async (req) => {
       // Single restaurant refresh — bypass cooldown, re-scrape only one
       if (singleRestaurantId) {
         // Window check: only allow scraping on weekdays 08–14
-        const window = isWithinFetchWindow(now, windowStart, windowEnd);
+        const window = isWithinFetchWindow(now, windowStart, windowEnd, windowDisabled);
         if (!window.allowed) {
           console.log(`Single refresh blocked – outside fetch window: ${window.reason}`);
           const menus = sortByName((await fillMissingFromYesterday(cached.map((row: any) => normalizeMenuData(row.menu_data)))).map((m: any) => ({ ...m, stale: m?.date !== todayKey })));
