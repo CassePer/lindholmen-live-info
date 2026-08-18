@@ -318,6 +318,62 @@ function RestaurantCard({
   );
 }
 
+function WeekDayTabs({
+  days,
+  selected,
+  onSelect,
+  todayKey,
+}: {
+  days: { date: string; dayKey: string }[];
+  selected: string;
+  onSelect: (date: string) => void;
+  todayKey: string;
+}) {
+  const handleKey = (e: React.KeyboardEvent) => {
+    const i = days.findIndex((d) => d.date === selected);
+    if (e.key === "ArrowRight" && i < days.length - 1) {
+      e.preventDefault();
+      onSelect(days[i + 1].date);
+    } else if (e.key === "ArrowLeft" && i > 0) {
+      e.preventDefault();
+      onSelect(days[i - 1].date);
+    }
+  };
+
+  return (
+    <div
+      role="tablist"
+      aria-label="Välj dag"
+      onKeyDown={handleKey}
+      className="grid grid-cols-5 gap-1 rounded-xl border border-border/60 bg-muted/40 p-1"
+    >
+      {days.map((d) => {
+        const active = d.date === selected;
+        return (
+          <button
+            key={d.date}
+            role="tab"
+            aria-selected={active}
+            tabIndex={active ? 0 : -1}
+            onClick={() => onSelect(d.date)}
+            className={`flex flex-col items-center rounded-lg px-1 py-1.5 text-xs transition-colors ${
+              active
+                ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                : "text-muted-foreground hover:bg-background/70"
+            }`}
+          >
+            <span>{DAY_LABELS[d.dayKey] ?? d.dayKey}</span>
+            <span className={`text-[10px] ${active ? "opacity-90" : "opacity-70"}`}>
+              {shortDayDate(d.date)}
+              {d.date === todayKey ? " •" : ""}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function LunchPage({ embedded }: { embedded?: boolean }) {
   const [search, setSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
@@ -326,6 +382,7 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
   const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshingId, setRefreshingId] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const activeSearch = showSearch ? search : "";
 
