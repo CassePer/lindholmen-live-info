@@ -501,6 +501,15 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
         )}
       </AnimatePresence>
 
+      {weekDays.length > 0 && (
+        <WeekDayTabs
+          days={weekDays}
+          selected={effectiveDate}
+          onSelect={setSelectedDate}
+          todayKey={todayKey}
+        />
+      )}
+
       {aiCreditsExhausted && (
         <div
           role="alert"
@@ -518,13 +527,32 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
       ) : error ? (
         <ErrorState message="Kunde inte hämta dagens menyer. Försök igen senare." />
       ) : !filtered?.length ? (
-        <ErrorState message={activeSearch ? `Inga resultat för "${activeSearch}".` : "Inga menyer hittades för idag."} />
+        <ErrorState
+          message={
+            activeSearch
+              ? `Inga resultat för "${activeSearch}".`
+              : isToday
+              ? "Inga menyer hittades för idag."
+              : "Inga menyer hittades för denna dag."
+          }
+        />
       ) : (
-        <div className="space-y-4">
+        <motion.div
+          className="space-y-4"
+          drag={weekDays.length > 1 ? "x" : false}
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.08}
+          onDragEnd={(_, info) => {
+            if (Math.abs(info.offset.x) < 60) return;
+            const i = weekDays.findIndex((d) => d.date === effectiveDate);
+            const next = info.offset.x < 0 ? i + 1 : i - 1;
+            if (next >= 0 && next < weekDays.length) setSelectedDate(weekDays[next].date);
+          }}
+        >
           <AnimatePresence mode="popLayout">
             {filtered.map((menu, i) => (
               <motion.div
-                key={menu.restaurantId}
+                key={`${effectiveDate}-${menu.restaurantId}`}
                 custom={i}
                 variants={cardVariants}
                 initial="hidden"
