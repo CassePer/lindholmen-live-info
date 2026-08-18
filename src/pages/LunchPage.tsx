@@ -218,7 +218,7 @@ function RestaurantCard({
     : undefined;
   const refreshState = getRefreshState(menu.updatedAt, new Date(), windowStart, windowEnd);
   const lockedByToday = hideWhenComplete && hasTodaysMenu;
-  const refreshDisabled = !refreshState.allowed || isRefreshing || lockedByToday;
+  const refreshDisabled = !isToday || !refreshState.allowed || isRefreshing || lockedByToday;
 
   return (
     <Card className="glass-card hover-scale">
@@ -244,7 +244,7 @@ function RestaurantCard({
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  onClick={() => !lockedByToday && refreshState.allowed && onRefresh(menu.restaurantId)}
+                  onClick={() => !refreshDisabled && onRefresh(menu.restaurantId)}
                   disabled={refreshDisabled}
                   className="text-muted-foreground hover:text-primary transition-colors p-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-muted-foreground"
                   aria-label={`Uppdatera ${menu.restaurantName}s meny`}
