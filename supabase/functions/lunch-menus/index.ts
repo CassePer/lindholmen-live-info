@@ -745,7 +745,7 @@ Deno.serve(async (req) => {
           console.log(`Single refresh blocked – outside fetch window: ${window.reason}`);
           const menus = sortByName((await fillMissingFromYesterday(cached.map((row: any) => normalizeMenuData(row.menu_data)))).map((m: any) => ({ ...m, stale: m?.date !== todayKey })));
           return new Response(
-            JSON.stringify({ cooldown: true, minutesLeft: 0, reason: window.reason, menus }),
+            JSON.stringify({ cooldown: true, minutesLeft: 0, reason: window.reason, menus, week }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
@@ -759,7 +759,7 @@ Deno.serve(async (req) => {
             console.log(`Per-restaurant refresh blocked for ${singleRestaurantId} – ${minutesLeft}min left`);
             const menus = sortByName((await fillMissingFromYesterday(cached.map((row: any) => normalizeMenuData(row.menu_data)))).map((m: any) => ({ ...m, stale: m?.date !== todayKey })));
             return new Response(
-              JSON.stringify({ cooldown: true, minutesLeft, menus }),
+              JSON.stringify({ cooldown: true, minutesLeft, menus, week }),
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
           }
@@ -772,7 +772,7 @@ Deno.serve(async (req) => {
           console.log(`Force refresh blocked – outside fetch window: ${window.reason}`);
           const menus = sortByName((await fillMissingFromYesterday(cached.map((row: any) => normalizeMenuData(row.menu_data)))).map((m: any) => ({ ...m, stale: m?.date !== todayKey })));
           return new Response(
-            JSON.stringify({ cooldown: true, minutesLeft: 0, reason: window.reason, menus }),
+            JSON.stringify({ cooldown: true, minutesLeft: 0, reason: window.reason, menus, week }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
@@ -786,7 +786,7 @@ Deno.serve(async (req) => {
           const minutesLeft = Math.ceil((COOLDOWN_MS - ageMs) / 60000);
           console.log(`Force refresh blocked – cache is ${Math.floor(ageMs / 60000)}min old, cooldown ${minutesLeft}min left`);
           const menus = sortByName((await fillMissingFromYesterday(cached.map((row: any) => normalizeMenuData(row.menu_data)))).map((m: any) => ({ ...m, stale: m?.date !== todayKey })));
-          return new Response(JSON.stringify({ cooldown: true, minutesLeft, menus }), {
+          return new Response(JSON.stringify({ cooldown: true, minutesLeft, menus, week }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
@@ -799,7 +799,7 @@ Deno.serve(async (req) => {
         const todaysMenus = cached.map((row: any) => normalizeMenuData(row.menu_data));
         const filled = await fillMissingFromYesterday(todaysMenus);
         const stamped = filled.map((m: any) => ({ ...m, stale: m?.date !== todayKey }));
-        return new Response(JSON.stringify({ menus: sortByName(stamped) }), {
+        return new Response(JSON.stringify({ menus: sortByName(stamped), week }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -809,7 +809,7 @@ Deno.serve(async (req) => {
       if (!window.allowed) {
         console.log(`Refresh blocked – outside fetch window: ${window.reason}`);
         return new Response(
-          JSON.stringify({ cooldown: true, minutesLeft: 0, reason: window.reason, menus: [] }),
+          JSON.stringify({ cooldown: true, minutesLeft: 0, reason: window.reason, menus: [], week }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -820,7 +820,7 @@ Deno.serve(async (req) => {
       if (!window.allowed) {
         console.log(`Initial scrape blocked – outside fetch window: ${window.reason}`);
         return new Response(
-          JSON.stringify({ menus: [], reason: window.reason }),
+          JSON.stringify({ menus: [], reason: window.reason, week }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -840,7 +840,7 @@ Deno.serve(async (req) => {
 
     if (restError || !restaurants?.length) {
       console.error('Failed to load restaurants:', restError);
-      return new Response(JSON.stringify({ menus: [] }), {
+      return new Response(JSON.stringify({ menus: [], week }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -1079,14 +1079,14 @@ Deno.serve(async (req) => {
         .map((row: any) => normalizeMenuData(row.menu_data));
       const merged = [...existingMenus, ...allMenus];
       console.log(`Merged: ${allMenus.length} refreshed + ${existingMenus.length} cached = ${merged.length} total`);
-      return new Response(JSON.stringify({ menus: sortByName(withStale(merged)), aiCreditsExhausted }), {
+      return new Response(JSON.stringify({ menus: sortByName(withStale(merged)), aiCreditsExhausted, week }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     console.log(`Done. Got menus for ${(allMenus as any[]).filter((m: any) => m.dishes.length > 0).length}/${restaurants.length} restaurants.`);
 
-    return new Response(JSON.stringify({ menus: sortByName(withStale(allMenus as any[])), aiCreditsExhausted }), {
+    return new Response(JSON.stringify({ menus: sortByName(withStale(allMenus as any[])), aiCreditsExhausted, week }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
