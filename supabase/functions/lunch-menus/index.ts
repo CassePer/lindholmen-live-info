@@ -77,6 +77,7 @@ function isWithinFetchWindow(
   date: Date,
   startHour = 6,
   endHour = 14,
+  windowDisabled = false,
 ): { allowed: boolean; reason?: string } {
   const parts = new Intl.DateTimeFormat('sv-SE', {
     timeZone: 'Europe/Stockholm',
@@ -90,7 +91,7 @@ function isWithinFetchWindow(
   // sv-SE short weekday: mån, tis, ons, tors, fre, lör, sön
   const isWeekday = ['mån', 'tis', 'ons', 'tors', 'fre'].includes(weekday);
   if (!isWeekday) return { allowed: false, reason: 'Hämtning av menyer är endast tillåten på vardagar (mån–fre).' };
-  if (hour < startHour || hour >= endHour) {
+  if (!windowDisabled && (hour < startHour || hour >= endHour)) {
     const pad = (n: number) => String(n).padStart(2, '0');
     return {
       allowed: false,
