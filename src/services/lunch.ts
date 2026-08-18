@@ -1,8 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { LunchMenu } from "@/api/types";
+import type { LunchMenu, LunchWeek } from "@/api/types";
 
 export interface LunchMenusResult {
   menus: LunchMenu[];
+  week?: LunchWeek;
   aiCreditsExhausted?: boolean;
   cooldown?: boolean;
   minutesLeft?: number;

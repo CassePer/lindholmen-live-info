@@ -14,6 +14,30 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { LunchMenu, DietTag } from "@/api/types";
 
+const DAY_LABELS: Record<string, string> = {
+  mon: "Mån",
+  tue: "Tis",
+  wed: "Ons",
+  thu: "Tors",
+  fri: "Fre",
+};
+
+/** Today's date (YYYY-MM-DD) in Europe/Stockholm. */
+function stockholmDateKey(d: Date = new Date()) {
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Stockholm",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+function shortDayDate(iso: string) {
+  const d = new Date(`${iso}T12:00:00`);
+  if (isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("sv-SE", { day: "numeric", month: "numeric" }).format(d);
+}
+
 const TAG_LABELS: Record<DietTag, string> = {
   vegetarisk: "Vegetarisk",
   vegansk: "Vegansk",
@@ -177,6 +201,7 @@ function RestaurantCard({
   windowEnd,
   hasTodaysMenu,
   hideWhenComplete,
+  isToday = true,
 }: {
   menu: LunchMenu;
   search: string;
@@ -186,6 +211,7 @@ function RestaurantCard({
   windowEnd: number;
   hasTodaysMenu: boolean;
   hideWhenComplete: boolean;
+  isToday?: boolean;
 }) {
   const mapsUrl = menu.address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(menu.address)}`
@@ -228,7 +254,9 @@ function RestaurantCard({
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="max-w-[220px] text-xs">
-                {lockedByToday
+                {!isToday
+                  ? "Uppdatering endast möjlig för dagens datum"
+                  : lockedByToday
                   ? "Dagens meny finns redan"
                   : refreshState.allowed
                   ? "Uppdatera meny"
@@ -267,6 +295,21 @@ function RestaurantCard({
           </ul>
         ) : (
           <p className="text-sm text-muted-foreground italic">
+            {!isToday ? (
+              <>
+                Ingen meny publicerad för denna dag. Besök{" "}
+                <a
+                  href={menu.websiteUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-primary"
+                >
+                  restaurangens webbplats
+                </a>
+                .
+              </>
+            ) : (
+              <>
             Menyn kunde inte hämtas just nu. Besök{" "}
             <a
               href={menu.websiteUrl}
@@ -277,6 +320,8 @@ function RestaurantCard({
               restaurangens webbplats
             </a>{" "}
             för dagens lunch.
+              </>
+            )}
           </p>
         )}
         {isValidDate(menu.updatedAt) && (
@@ -294,6 +339,62 @@ function RestaurantCard({
   );
 }
 
+function WeekDayTabs({
+  days,
+  selected,
+  onSelect,
+  todayKey,
+}: {
+  days: { date: string; dayKey: string }[];
+  selected: string;
+  onSelect: (date: string) => void;
+  todayKey: string;
+}) {
+  const handleKey = (e: React.KeyboardEvent) => {
+    const i = days.findIndex((d) => d.date === selected);
+    if (e.key === "ArrowRight" && i < days.length - 1) {
+      e.preventDefault();
+      onSelect(days[i + 1].date);
+    } else if (e.key === "ArrowLeft" && i > 0) {
+      e.preventDefault();
+      onSelect(days[i - 1].date);
+    }
+  };
+
+  return (
+    <div
+      role="tablist"
+      aria-label="Välj dag"
+      onKeyDown={handleKey}
+      className="grid grid-cols-5 gap-1 rounded-xl border border-border/60 bg-muted/40 p-1"
+    >
+      {days.map((d) => {
+        const active = d.date === selected;
+        return (
+          <button
+            key={d.date}
+            role="tab"
+            aria-selected={active}
+            tabIndex={active ? 0 : -1}
+            onClick={() => onSelect(d.date)}
+            className={`flex flex-col items-center rounded-lg px-1 py-1.5 text-xs transition-colors ${
+              active
+                ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                : "text-muted-foreground hover:bg-background/70"
+            }`}
+          >
+            <span>{DAY_LABELS[d.dayKey] ?? d.dayKey}</span>
+            <span className={`text-[10px] ${active ? "opacity-90" : "opacity-70"}`}>
+              {shortDayDate(d.date)}
+              {d.date === todayKey ? " •" : ""}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function LunchPage({ embedded }: { embedded?: boolean }) {
   const [search, setSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
@@ -302,6 +403,7 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
   const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshingId, setRefreshingId] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const activeSearch = showSearch ? search : "";
 
@@ -355,7 +457,22 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
     }
   };
 
-  const menus = data?.menus ?? [];
+  const todayKey = stockholmDateKey();
+  const week = data?.week;
+  const weekDays = week?.days ?? [];
+  // Default to today; on weekends (today not in the Mon–Fri list) pick Monday.
+  const effectiveDate =
+    selectedDate && weekDays.some((d) => d.date === selectedDate)
+      ? selectedDate
+      : weekDays.some((d) => d.date === todayKey)
+      ? todayKey
+      : weekDays[0]?.date ?? todayKey;
+  const isToday = effectiveDate === todayKey;
+
+  const todaysMenus = data?.menus ?? [];
+  const menus = !week || isToday
+    ? todaysMenus
+    : weekDays.find((d) => d.date === effectiveDate)?.menus ?? [];
   const aiCreditsExhausted = data?.aiCreditsExhausted ?? false;
   const filtered = menus.filter((m) =>
     m.restaurantName.toLowerCase().includes(activeSearch.toLowerCase()) ||
@@ -366,8 +483,8 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
   // (non-stale) menu with dishes. We rely on the server-set `stale` flag so
   // we don't get bitten by client/server timezone drift near midnight.
   const isTodaysMenu = (m: LunchMenu) => !m.stale && m.dishes.length > 0;
-  const allTodaysMenusPresent = menus.length > 0 && menus.every(isTodaysMenu);
-  const hideGlobalRefresh = hideWhenComplete && allTodaysMenusPresent;
+  const allTodaysMenusPresent = todaysMenus.length > 0 && todaysMenus.every(isTodaysMenu);
+  const hideGlobalRefresh = !isToday || (hideWhenComplete && allTodaysMenusPresent);
 
   const content = (
     <div className={embedded ? "space-y-4" : "container max-w-lg mx-auto px-4 py-6 space-y-4"}>
@@ -405,6 +522,15 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
         )}
       </AnimatePresence>
 
+      {weekDays.length > 0 && (
+        <WeekDayTabs
+          days={weekDays}
+          selected={effectiveDate}
+          onSelect={setSelectedDate}
+          todayKey={todayKey}
+        />
+      )}
+
       {aiCreditsExhausted && (
         <div
           role="alert"
@@ -422,13 +548,32 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
       ) : error ? (
         <ErrorState message="Kunde inte hämta dagens menyer. Försök igen senare." />
       ) : !filtered?.length ? (
-        <ErrorState message={activeSearch ? `Inga resultat för "${activeSearch}".` : "Inga menyer hittades för idag."} />
+        <ErrorState
+          message={
+            activeSearch
+              ? `Inga resultat för "${activeSearch}".`
+              : isToday
+              ? "Inga menyer hittades för idag."
+              : "Inga menyer hittades för denna dag."
+          }
+        />
       ) : (
-        <div className="space-y-4">
+        <motion.div
+          className="space-y-4"
+          drag={weekDays.length > 1 ? "x" : false}
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.08}
+          onDragEnd={(_, info) => {
+            if (Math.abs(info.offset.x) < 60) return;
+            const i = weekDays.findIndex((d) => d.date === effectiveDate);
+            const next = info.offset.x < 0 ? i + 1 : i - 1;
+            if (next >= 0 && next < weekDays.length) setSelectedDate(weekDays[next].date);
+          }}
+        >
           <AnimatePresence mode="popLayout">
             {filtered.map((menu, i) => (
               <motion.div
-                key={menu.restaurantId}
+                key={`${effectiveDate}-${menu.restaurantId}`}
                 custom={i}
                 variants={cardVariants}
                 initial="hidden"
@@ -443,13 +588,14 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
                   isRefreshing={refreshingId === menu.restaurantId}
                   windowStart={windowStart}
                   windowEnd={windowEnd}
-                  hasTodaysMenu={isTodaysMenu(menu)}
-                  hideWhenComplete={hideWhenComplete}
+                  hasTodaysMenu={!isToday ? true : isTodaysMenu(menu)}
+                  hideWhenComplete={!isToday ? true : hideWhenComplete}
+                  isToday={isToday}
                 />
               </motion.div>
             ))}
           </AnimatePresence>
-        </div>
+        </motion.div>
       )}
 
       <footer className="text-xs text-muted-foreground text-center pt-4 pb-8 space-y-1">

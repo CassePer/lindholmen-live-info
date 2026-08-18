@@ -51,6 +51,18 @@ export interface WeeklyLunchMenu {
   updatedAt: string;
 }
 
+/** One weekday of the current ISO week, with all restaurants' menus for that day. */
+export interface LunchDay {
+  date: string; // YYYY-MM-DD
+  dayKey: string; // mon | tue | ...
+  menus: LunchMenu[];
+}
+
+export interface LunchWeek {
+  weekStart: string; // Monday, YYYY-MM-DD
+  days: LunchDay[];
+}
+
 // ── Departures ──
 
 export type TransportType = "Färja" | "Spårvagn" | "Buss" | "Tåg";
