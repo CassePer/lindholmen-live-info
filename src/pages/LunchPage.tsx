@@ -591,8 +591,8 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
                   isRefreshing={refreshingId === menu.restaurantId}
                   windowStart={windowStart}
                   windowEnd={windowEnd}
-                  hasTodaysMenu={!isToday ? true : isTodaysMenu(menu)}
-                  hideWhenComplete={!isToday ? true : hideWhenComplete}
+                  hasTodaysMenu={hasDayMenu(menu)}
+                  hideWhenComplete={hideWhenComplete}
                   isToday={isToday}
                 />
               </motion.div>
