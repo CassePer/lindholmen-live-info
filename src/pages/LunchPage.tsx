@@ -416,6 +416,7 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
     return Number.isFinite(n) ? Math.max(1, Math.min(24, n)) : 14;
   })();
   const hideWhenComplete = settings?.lunch_hide_refresh_when_complete !== "false";
+  const weekViewEnabled = settings?.lunch_week_view_enabled !== "false";
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -458,7 +459,7 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
   };
 
   const todayKey = stockholmDateKey();
-  const week = data?.week;
+  const week = weekViewEnabled ? data?.week : undefined;
   const weekDays = week?.days ?? [];
   // Default to today; on weekends (today not in the Mon–Fri list) pick Monday.
   const effectiveDate =
@@ -522,7 +523,7 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
         )}
       </AnimatePresence>
 
-      {weekDays.length > 0 && (
+      {weekViewEnabled && weekDays.length > 0 && (
         <WeekDayTabs
           days={weekDays}
           selected={effectiveDate}
