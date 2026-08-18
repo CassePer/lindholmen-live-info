@@ -567,13 +567,14 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
                   isRefreshing={refreshingId === menu.restaurantId}
                   windowStart={windowStart}
                   windowEnd={windowEnd}
-                  hasTodaysMenu={isTodaysMenu(menu)}
-                  hideWhenComplete={hideWhenComplete}
+                  hasTodaysMenu={!isToday ? true : isTodaysMenu(menu)}
+                  hideWhenComplete={!isToday ? true : hideWhenComplete}
+                  isToday={isToday}
                 />
               </motion.div>
             ))}
           </AnimatePresence>
-        </div>
+        </motion.div>
       )}
 
       <footer className="text-xs text-muted-foreground text-center pt-4 pb-8 space-y-1">
