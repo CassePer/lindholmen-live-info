@@ -484,8 +484,10 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
   // (non-stale) menu with dishes. We rely on the server-set `stale` flag so
   // we don't get bitten by client/server timezone drift near midnight.
   const isTodaysMenu = (m: LunchMenu) => !m.stale && m.dishes.length > 0;
-  const allTodaysMenusPresent = todaysMenus.length > 0 && todaysMenus.every(isTodaysMenu);
-  const hideGlobalRefresh = !isToday || (hideWhenComplete && allTodaysMenusPresent);
+  // Completeness is evaluated for the currently selected day, not only today.
+  const hasDayMenu = (m: LunchMenu) => (isToday ? !m.stale && m.dishes.length > 0 : m.dishes.length > 0);
+  const allDayMenusPresent = menus.length > 0 && menus.every(hasDayMenu);
+  const hideGlobalRefresh = !isToday || (hideWhenComplete && allDayMenusPresent);
 
   const content = (
     <div className={embedded ? "space-y-4" : "container max-w-lg mx-auto px-4 py-6 space-y-4"}>
