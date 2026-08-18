@@ -201,6 +201,7 @@ function RestaurantCard({
   windowEnd,
   hasTodaysMenu,
   hideWhenComplete,
+  isToday = true,
 }: {
   menu: LunchMenu;
   search: string;
@@ -210,6 +211,7 @@ function RestaurantCard({
   windowEnd: number;
   hasTodaysMenu: boolean;
   hideWhenComplete: boolean;
+  isToday?: boolean;
 }) {
   const mapsUrl = menu.address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(menu.address)}`
@@ -291,6 +293,21 @@ function RestaurantCard({
           </ul>
         ) : (
           <p className="text-sm text-muted-foreground italic">
+            {!isToday ? (
+              <>
+                Ingen meny publicerad för denna dag. Besök{" "}
+                <a
+                  href={menu.websiteUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-primary"
+                >
+                  restaurangens webbplats
+                </a>
+                .
+              </>
+            ) : (
+              <>
             Menyn kunde inte hämtas just nu. Besök{" "}
             <a
               href={menu.websiteUrl}
@@ -301,6 +318,8 @@ function RestaurantCard({
               restaurangens webbplats
             </a>{" "}
             för dagens lunch.
+              </>
+            )}
           </p>
         )}
         {isValidDate(menu.updatedAt) && (
