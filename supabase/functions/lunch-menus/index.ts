@@ -652,9 +652,7 @@ Deno.serve(async (req) => {
     // restaurant missing from today's results, substitute yesterday's menu
     // (marked stale). Never reaches further back than 1 day.
     function yesterdayKeyOf(d: Date): string {
-      const y = new Date(d);
-      y.setDate(y.getDate() - 1);
-      return getTodayKey(y);
+      return shiftKey(getTodayKey(d), -1);
     }
     const allowedPrevDatesGlobal = new Set<string>([todayKey, yesterdayKeyOf(now)]);
 
@@ -704,14 +702,11 @@ Deno.serve(async (req) => {
 
     /** Build a Mon–Fri view of the current ISO week purely from cache. */
     async function buildWeek() {
-      const monday = new Date(now);
-      const dow = monday.getDay();
-      monday.setDate(monday.getDate() + (dow === 0 ? -6 : 1 - dow));
+      const mondayStr = mondayKeyOf(now);
       const dayDefs: { date: string; dayKey: DayKey }[] = [];
       for (let i = 0; i < 5; i++) {
-        const d = new Date(monday);
-        d.setDate(monday.getDate() + i);
-        dayDefs.push({ date: getTodayKey(d), dayKey: DAY_KEYS_BY_INDEX[d.getDay()] });
+        const date = shiftKey(mondayStr, i);
+        dayDefs.push({ date, dayKey: DAY_KEYS_BY_INDEX[anchorFromKey(date).getUTCDay()] });
       }
 
       const { data: rows } = await supabase
@@ -904,9 +899,7 @@ Deno.serve(async (req) => {
     // Only substitute from "yesterday or today" — never older. The user
     // explicitly does not want stale messages pointing to data from days ago.
     function yesterdayKey(d: Date): string {
-      const y = new Date(d);
-      y.setDate(y.getDate() - 1);
-      return getTodayKey(y);
+      return shiftKey(getTodayKey(d), -1);
     }
     const allowedPrevDates = new Set<string>([todayKey, yesterdayKey(now)]);
 
