@@ -703,7 +703,7 @@ Deno.serve(async (req) => {
       md?.weekly ? weeklyToTodayMenu(md as WeeklyMenuRaw, now, todayKey) : md;
 
     const sortByName = (list: any[]) =>
-      [...list].sort((a, b) =>
+      dedupeByRestaurant(list).sort((a, b) =>
         String(a?.restaurantName ?? '').localeCompare(String(b?.restaurantName ?? ''), 'sv')
       );
 
