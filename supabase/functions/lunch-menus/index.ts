@@ -703,9 +703,21 @@ Deno.serve(async (req) => {
       md?.weekly ? weeklyToTodayMenu(md as WeeklyMenuRaw, now, todayKey) : md;
 
     const sortByName = (list: any[]) =>
-      [...list].sort((a, b) =>
+      dedupeByRestaurant(list).sort((a, b) =>
         String(a?.restaurantName ?? '').localeCompare(String(b?.restaurantName ?? ''), 'sv')
       );
+
+    /** One entry per restaurant; weekly-derived menus win over daily rows. */
+    const dedupeByRestaurant = (list: any[]) => {
+      const byId = new Map<string, any>();
+      for (const m of list) {
+        const id = m?.restaurantId;
+        if (!id) continue;
+        const prev = byId.get(id);
+        if (!prev || (!prev.weekly && m?.weekly)) byId.set(id, m);
+      }
+      return Array.from(byId.values());
+    };
 
     // Helper used by both cache-serve and scrape paths: for any active
     // restaurant missing from today's results, substitute yesterday's menu
@@ -787,7 +799,7 @@ Deno.serve(async (req) => {
           .filter((r: any) => !r.menu_data?.weekly && r.week_key === date)
           .map((r: any) => r.menu_data);
         const weekly = weeklyRows.map((r: any) => weeklyToDayMenu(r.menu_data as WeeklyMenuRaw, dayKey, date));
-        const menus = [...daily, ...weekly];
+        const menus = dedupeByRestaurant([...daily, ...weekly]);
         const haveIds = new Set(menus.map((m: any) => m?.restaurantId));
         const stubs = (activeRest ?? [])
           .filter((r: any) => !haveIds.has(r.id))
@@ -806,7 +818,7 @@ Deno.serve(async (req) => {
       return { weekStart: dayDefs[0].date, days };
     }
 
-    const week = await buildWeek();
+    let week = await buildWeek();
 
     // Check cache for today
     const { data: cacheRowsAll, error: cacheError } = await supabase
@@ -823,6 +835,27 @@ Deno.serve(async (req) => {
     const hasTodayDaily = (cacheRowsAll ?? []).some(
       (row: any) => row.week_key === todayKey && !row.menu_data?.weekly
     );
+
+    // Backfill: restaurants flagged as weekly_menu that have NO weekly cache row
+    // for this Monday. Without this, a present daily cache short-circuits the
+    // request and the week view never gets per-day data for them.
+    let weeklyBackfillIds: string[] = [];
+    if (!force && !singleRestaurantId) {
+      const { data: weeklyRest } = await supabase
+        .from('restaurants')
+        .select('id')
+        .eq('active', true)
+        .eq('weekly_menu', true);
+      const haveWeekly = new Set(
+        (cacheRowsAll ?? [])
+          .filter((r: any) => r.menu_data?.weekly && r.menu_data?.weekStart === mondayKey)
+          .map((r: any) => r.menu_data?.restaurantId)
+      );
+      const missing = (weeklyRest ?? []).map((r: any) => r.id).filter((id: string) => !haveWeekly.has(id));
+      if (missing.length > 0 && isWithinFetchWindow(now, windowStart, windowEnd, windowDisabled).allowed) {
+        weeklyBackfillIds = missing;
+      }
+    }
 
     if (!cacheError && hasTodayDaily && cached.length > 0) {
       // Single restaurant refresh — bypass cooldown, re-scrape only one
@@ -881,7 +914,7 @@ Deno.serve(async (req) => {
         // Cooldown passed – clear cache and re-scrape
         console.log(`Force refresh allowed – cache is ${Math.floor(ageMs / 60000)}min old`);
         await supabase.from('lunch_menu_cache').delete().in('week_key', cacheKeys);
-      } else {
+      } else if (weeklyBackfillIds.length === 0) {
         // Normal request – serve from cache
         console.log(`Serving ${cached.length} menus from cache for ${todayKey}`);
         const todaysMenus = cached.map((row: any) => normalizeMenuData(row.menu_data));
@@ -890,6 +923,8 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ menus: sortByName(stamped), week }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
+      } else {
+        console.log(`Weekly backfill for ${weeklyBackfillIds.length} restaurant(s) missing week ${mondayKey}`);
       }
     } else if (force || singleRestaurantId) {
       // No cache yet — still enforce window for any scrape attempt
@@ -922,6 +957,8 @@ Deno.serve(async (req) => {
     
     if (singleRestaurantId) {
       restaurantQuery = restaurantQuery.eq('id', singleRestaurantId);
+    } else if (weeklyBackfillIds.length > 0) {
+      restaurantQuery = restaurantQuery.in('id', weeklyBackfillIds);
     }
 
     const { data: restaurants, error: restError } = await restaurantQuery.order('name');
@@ -1177,8 +1214,11 @@ Deno.serve(async (req) => {
         return { ...rest, stale: rest?.date !== todayKey };
       });
 
-    // If single restaurant refresh, merge with existing cached menus and return full list
-    if (singleRestaurantId && cached && cached.length > 0) {
+    // Week view must reflect anything we just cached.
+    week = await buildWeek();
+
+    // Partial scrape (single restaurant or weekly backfill): merge with cache
+    if ((singleRestaurantId || weeklyBackfillIds.length > 0) && cached && cached.length > 0) {
       const updatedIds = new Set(allMenus.map((m: any) => m.restaurantId));
       const existingMenus = cached
         .filter((row: any) => !updatedIds.has(row.menu_data?.restaurantId))
