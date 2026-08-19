@@ -707,6 +707,18 @@ Deno.serve(async (req) => {
         String(a?.restaurantName ?? '').localeCompare(String(b?.restaurantName ?? ''), 'sv')
       );
 
+    /** One entry per restaurant; weekly-derived menus win over daily rows. */
+    const dedupeByRestaurant = (list: any[]) => {
+      const byId = new Map<string, any>();
+      for (const m of list) {
+        const id = m?.restaurantId;
+        if (!id) continue;
+        const prev = byId.get(id);
+        if (!prev || (!prev.weekly && m?.weekly)) byId.set(id, m);
+      }
+      return Array.from(byId.values());
+    };
+
     // Helper used by both cache-serve and scrape paths: for any active
     // restaurant missing from today's results, substitute yesterday's menu
     // (marked stale). Never reaches further back than 1 day.
@@ -787,7 +799,7 @@ Deno.serve(async (req) => {
           .filter((r: any) => !r.menu_data?.weekly && r.week_key === date)
           .map((r: any) => r.menu_data);
         const weekly = weeklyRows.map((r: any) => weeklyToDayMenu(r.menu_data as WeeklyMenuRaw, dayKey, date));
-        const menus = [...daily, ...weekly];
+        const menus = dedupeByRestaurant([...daily, ...weekly]);
         const haveIds = new Set(menus.map((m: any) => m?.restaurantId));
         const stubs = (activeRest ?? [])
           .filter((r: any) => !haveIds.has(r.id))
