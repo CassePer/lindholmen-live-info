@@ -994,7 +994,7 @@ Deno.serve(async (req) => {
               return { ...weeklyToTodayMenu(cachedWeekly, now, todayKey), _substituted: true };
             }
             // Scrape full page and extract structured per-day menu
-            const { markdown } = await scrapeUrl(r.menu_url, firecrawlKey);
+            const { markdown, screenshot } = await scrapeUrl(r.menu_url, firecrawlKey);
             let byDay: Record<string, { name: string; tags?: string[] }[]> | null = null;
             if (markdown && markdown.length >= MIN_MARKDOWN_LENGTH) {
               byDay = await extractWeeklyMenuFromText(r.name, markdown, lovableKey, todayKey);
@@ -1002,6 +1002,21 @@ Deno.serve(async (req) => {
                 for (const k of Object.keys(byDay)) {
                   byDay[k] = dedupeDishes(byDay[k] ?? []);
                 }
+              }
+            }
+            if ((!byDay || !weeklyHasAnyDishes(byDay)) && screenshot) {
+              console.log(`Falling back to weekly vision for ${r.name}`);
+              const visionByDay = await extractWeeklyMenuFromScreenshot(
+                r.name,
+                screenshot,
+                lovableKey,
+                todayKey,
+              );
+              if (visionByDay) {
+                for (const k of Object.keys(visionByDay)) {
+                  visionByDay[k] = dedupeDishes(visionByDay[k] ?? []);
+                }
+                if (weeklyHasAnyDishes(visionByDay)) byDay = visionByDay;
               }
             }
             console.log(
