@@ -945,6 +945,11 @@ Deno.serve(async (req) => {
                 }
               }
             }
+            console.log(
+              `Weekly scrape ${r.name}: markdown=${markdown?.length ?? 0} chars, byDay=${
+                byDay ? JSON.stringify(Object.fromEntries(Object.entries(byDay).map(([k, v]) => [k, (v ?? []).length]))) : 'null'
+              }`,
+            );
             if (!byDay || !weeklyHasAnyDishes(byDay)) {
               // Fallback: keep previously known menu (today's view) for this restaurant
               const prev = latestByRestaurant.get(r.id);
