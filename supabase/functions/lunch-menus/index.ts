@@ -453,6 +453,72 @@ function weeklyHasAnyDishes(byDay: Record<string, any>): boolean {
   return false;
 }
 
+/** Vision fallback: extract a full week menu from a page screenshot. */
+async function extractWeeklyMenuFromScreenshot(
+  name: string,
+  screenshotData: string,
+  apiKey: string,
+  todayStr: string
+): Promise<Record<string, { name: string; tags?: string[] }[]> | null> {
+  const systemPrompt =
+    buildWeekPrompt(name, todayStr) + '\n\nAnalysera bilden/skärmbilden av restaurangens meny nedan.';
+
+  let imageUrl: string;
+  if (screenshotData.startsWith('data:')) {
+    imageUrl = screenshotData;
+  } else if (screenshotData.startsWith('http')) {
+    const base64 = await fetchImageAsBase64(screenshotData);
+    if (!base64) {
+      console.error(`Failed to fetch screenshot for ${name}`);
+      return null;
+    }
+    imageUrl = `data:image/png;base64,${base64}`;
+  } else {
+    imageUrl = `data:image/png;base64,${screenshotData}`;
+  }
+
+  try {
+    const res = await fetch(AI_GATEWAY, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: systemPrompt },
+            { type: 'image_url', image_url: { url: imageUrl } },
+          ],
+        }],
+        temperature: 0.1,
+      }),
+    });
+    if (!res.ok) {
+      console.error(`AI weekly vision extraction failed for ${name}: ${res.status}`);
+      if (res.status === 402) aiCreditsExhausted = true;
+      return null;
+    }
+    const data = await res.json();
+    const content = data?.choices?.[0]?.message?.content || '';
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+    const parsed = JSON.parse(jsonMatch[0]);
+    const byDay = parsed?.dishesByDay;
+    if (!byDay || typeof byDay !== 'object') return null;
+    return byDay;
+  } catch (err) {
+    console.error(`AI weekly vision extraction error for ${name}:`, err);
+    return null;
+  }
+}
+
+function weeklyHasAnyDishesUnused(byDay: Record<string, any>): boolean {
+  for (const k of Object.keys(byDay)) {
+    if (Array.isArray(byDay[k]) && byDay[k].length > 0) return true;
+  }
+  return false;
+}
+
 async function fetchRssMenu(rssUrl: string, todayStr: string): Promise<string | null> {
   try {
     const res = await fetch(rssUrl);
