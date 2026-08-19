@@ -512,13 +512,6 @@ async function extractWeeklyMenuFromScreenshot(
   }
 }
 
-function weeklyHasAnyDishesUnused(byDay: Record<string, any>): boolean {
-  for (const k of Object.keys(byDay)) {
-    if (Array.isArray(byDay[k]) && byDay[k].length > 0) return true;
-  }
-  return false;
-}
-
 async function fetchRssMenu(rssUrl: string, todayStr: string): Promise<string | null> {
   try {
     const res = await fetch(rssUrl);
