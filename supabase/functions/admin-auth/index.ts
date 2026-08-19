@@ -84,7 +84,9 @@ Deno.serve(async (req) => {
 
     const valid = password === adminPassword;
     return new Response(JSON.stringify({ valid }), {
-      status: valid ? 200 : 401,
+      // Always 200: the client reads `valid`. A non-2xx status makes
+      // supabase.functions.invoke throw and surface a runtime error.
+      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch {
