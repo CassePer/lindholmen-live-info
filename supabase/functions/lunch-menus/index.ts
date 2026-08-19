@@ -913,7 +913,7 @@ Deno.serve(async (req) => {
         .eq('week_key', mondayKey);
       for (const row of (weeklyRows ?? []) as any[]) {
         const md = row.menu_data;
-        if (md?.weekly && md?.weekStart === mondayKey && md?.restaurantId) {
+        if (md?.weekly && md?.weekStart === mondayKey && md?.restaurantId && weeklyHasAnyDishes(md.dishesByDay ?? {})) {
           weeklyCacheByRestaurant.set(md.restaurantId, md as WeeklyMenuRaw);
         }
       }
