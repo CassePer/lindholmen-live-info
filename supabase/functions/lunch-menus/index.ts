@@ -453,6 +453,65 @@ function weeklyHasAnyDishes(byDay: Record<string, any>): boolean {
   return false;
 }
 
+/** Vision fallback: extract a full week menu from a page screenshot. */
+async function extractWeeklyMenuFromScreenshot(
+  name: string,
+  screenshotData: string,
+  apiKey: string,
+  todayStr: string
+): Promise<Record<string, { name: string; tags?: string[] }[]> | null> {
+  const systemPrompt =
+    buildWeekPrompt(name, todayStr) + '\n\nAnalysera bilden/skärmbilden av restaurangens meny nedan.';
+
+  let imageUrl: string;
+  if (screenshotData.startsWith('data:')) {
+    imageUrl = screenshotData;
+  } else if (screenshotData.startsWith('http')) {
+    const base64 = await fetchImageAsBase64(screenshotData);
+    if (!base64) {
+      console.error(`Failed to fetch screenshot for ${name}`);
+      return null;
+    }
+    imageUrl = `data:image/png;base64,${base64}`;
+  } else {
+    imageUrl = `data:image/png;base64,${screenshotData}`;
+  }
+
+  try {
+    const res = await fetch(AI_GATEWAY, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: systemPrompt },
+            { type: 'image_url', image_url: { url: imageUrl } },
+          ],
+        }],
+        temperature: 0.1,
+      }),
+    });
+    if (!res.ok) {
+      console.error(`AI weekly vision extraction failed for ${name}: ${res.status}`);
+      if (res.status === 402) aiCreditsExhausted = true;
+      return null;
+    }
+    const data = await res.json();
+    const content = data?.choices?.[0]?.message?.content || '';
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+    const parsed = JSON.parse(jsonMatch[0]);
+    const byDay = parsed?.dishesByDay;
+    if (!byDay || typeof byDay !== 'object') return null;
+    return byDay;
+  } catch (err) {
+    console.error(`AI weekly vision extraction error for ${name}:`, err);
+    return null;
+  }
+}
+
 async function fetchRssMenu(rssUrl: string, todayStr: string): Promise<string | null> {
   try {
     const res = await fetch(rssUrl);
@@ -913,7 +972,7 @@ Deno.serve(async (req) => {
         .eq('week_key', mondayKey);
       for (const row of (weeklyRows ?? []) as any[]) {
         const md = row.menu_data;
-        if (md?.weekly && md?.weekStart === mondayKey && md?.restaurantId) {
+        if (md?.weekly && md?.weekStart === mondayKey && md?.restaurantId && weeklyHasAnyDishes(md.dishesByDay ?? {})) {
           weeklyCacheByRestaurant.set(md.restaurantId, md as WeeklyMenuRaw);
         }
       }
@@ -935,7 +994,7 @@ Deno.serve(async (req) => {
               return { ...weeklyToTodayMenu(cachedWeekly, now, todayKey), _substituted: true };
             }
             // Scrape full page and extract structured per-day menu
-            const { markdown } = await scrapeUrl(r.menu_url, firecrawlKey);
+            const { markdown, screenshot } = await scrapeUrl(r.menu_url, firecrawlKey);
             let byDay: Record<string, { name: string; tags?: string[] }[]> | null = null;
             if (markdown && markdown.length >= MIN_MARKDOWN_LENGTH) {
               byDay = await extractWeeklyMenuFromText(r.name, markdown, lovableKey, todayKey);
@@ -945,6 +1004,26 @@ Deno.serve(async (req) => {
                 }
               }
             }
+            if ((!byDay || !weeklyHasAnyDishes(byDay)) && screenshot) {
+              console.log(`Falling back to weekly vision for ${r.name}`);
+              const visionByDay = await extractWeeklyMenuFromScreenshot(
+                r.name,
+                screenshot,
+                lovableKey,
+                todayKey,
+              );
+              if (visionByDay) {
+                for (const k of Object.keys(visionByDay)) {
+                  visionByDay[k] = dedupeDishes(visionByDay[k] ?? []);
+                }
+                if (weeklyHasAnyDishes(visionByDay)) byDay = visionByDay;
+              }
+            }
+            console.log(
+              `Weekly scrape ${r.name}: markdown=${markdown?.length ?? 0} chars, byDay=${
+                byDay ? JSON.stringify(Object.fromEntries(Object.entries(byDay).map(([k, v]) => [k, (v ?? []).length]))) : 'null'
+              }`,
+            );
             if (!byDay || !weeklyHasAnyDishes(byDay)) {
               // Fallback: keep previously known menu (today's view) for this restaurant
               const prev = latestByRestaurant.get(r.id);
