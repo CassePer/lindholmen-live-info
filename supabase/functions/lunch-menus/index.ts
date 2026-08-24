@@ -1211,18 +1211,16 @@ Deno.serve(async (req) => {
 
           // Fall back to page scraping (direct HTML, then Firecrawl markdown/vision)
           if (dishes.length === 0) {
-            const { text: pageText, source: textSource, screenshot } = await collectPageContent(
-              r.menu_url,
-              firecrawlKey,
-            );
-            console.log(
-              `Daily source ${r.name}: source=${textSource}, chars=${pageText?.length ?? 0}, sample=${
-                (pageText ?? '').slice(0, 300).replace(/\s+/g, ' ')
-              }`,
-            );
+            const { candidates, screenshot } = await collectPageContent(r.menu_url, firecrawlKey);
 
-            if (pageText && pageText.length >= MIN_MARKDOWN_LENGTH) {
-              dishes = await extractMenuFromText(r.name, pageText, lovableKey, todayKey);
+            for (const cand of candidates) {
+              console.log(
+                `Daily source ${r.name}: source=${cand.source}, chars=${cand.text.length}, sample=${
+                  cand.text.slice(0, 200).replace(/\s+/g, ' ')
+                }`,
+              );
+              dishes = await extractMenuFromText(r.name, cand.text, lovableKey, todayKey);
+              if (dishes.length > 0) break;
             }
 
             if (dishes.length === 0 && screenshot) {
@@ -1230,9 +1228,10 @@ Deno.serve(async (req) => {
               dishes = await extractMenuFromScreenshot(r.name, screenshot, lovableKey, todayKey);
             }
 
-            if (dishes.length === 0 && !pageText && !screenshot) {
+            if (dishes.length === 0 && candidates.length === 0 && !screenshot) {
               console.log(`No content scraped for ${r.name}`);
             }
+
           }
 
 
