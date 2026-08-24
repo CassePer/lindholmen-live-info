@@ -1092,11 +1092,19 @@ Deno.serve(async (req) => {
               // Reuse this week's cached weekly menu — no scrape, no cache write.
               return { ...weeklyToTodayMenu(cachedWeekly, now, todayKey), _substituted: true };
             }
-            // Scrape full page and extract structured per-day menu
-            const { markdown, screenshot } = await scrapeUrl(r.menu_url, firecrawlKey);
+            // Collect page text (direct HTML first, Firecrawl markdown as alternative)
+            const { text: pageText, source: textSource, screenshot } = await collectPageContent(
+              r.menu_url,
+              firecrawlKey,
+            );
+            console.log(
+              `Weekly source ${r.name}: source=${textSource}, chars=${pageText?.length ?? 0}, sample=${
+                (pageText ?? '').slice(0, 300).replace(/\s+/g, ' ')
+              }`,
+            );
             let byDay: Record<string, { name: string; tags?: string[] }[]> | null = null;
-            if (markdown && markdown.length >= MIN_MARKDOWN_LENGTH) {
-              byDay = await extractWeeklyMenuFromText(r.name, markdown, lovableKey, todayKey);
+            if (pageText && pageText.length >= MIN_MARKDOWN_LENGTH) {
+              byDay = await extractWeeklyMenuFromText(r.name, pageText, lovableKey, todayKey);
               if (byDay) {
                 for (const k of Object.keys(byDay)) {
                   byDay[k] = dedupeDishes(byDay[k] ?? []);
@@ -1119,10 +1127,11 @@ Deno.serve(async (req) => {
               }
             }
             console.log(
-              `Weekly scrape ${r.name}: markdown=${markdown?.length ?? 0} chars, byDay=${
+              `Weekly scrape ${r.name}: text=${pageText?.length ?? 0} chars (${textSource}), byDay=${
                 byDay ? JSON.stringify(Object.fromEntries(Object.entries(byDay).map(([k, v]) => [k, (v ?? []).length]))) : 'null'
               }`,
             );
+
             if (!byDay || !weeklyHasAnyDishes(byDay)) {
               // Fallback: keep previously known menu (today's view) for this restaurant
               const prev = latestByRestaurant.get(r.id);
