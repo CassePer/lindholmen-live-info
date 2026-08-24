@@ -200,28 +200,31 @@ async function fetchPageText(url: string): Promise<string | null> {
 }
 
 /**
- * Collect page text from the best available source:
- * direct HTML fetch first, Firecrawl markdown when it yields more text.
- * Screenshot (for vision fallback) always comes from Firecrawl.
+ * Collect candidate page texts. Direct HTML fetch is tried first (it keeps the
+ * full menu markup for server-rendered pages), Firecrawl markdown second
+ * (needed for JS-rendered pages). The screenshot powers the vision fallback.
  */
 async function collectPageContent(
   url: string,
   firecrawlKey: string,
-): Promise<{ text: string | null; source: 'direct' | 'firecrawl' | 'none'; screenshot: string | null }> {
+): Promise<{
+  candidates: { text: string; source: 'direct' | 'firecrawl' }[];
+  screenshot: string | null;
+}> {
   const [direct, scraped] = await Promise.all([
     fetchPageText(url),
     scrapeUrl(url, firecrawlKey),
   ]);
-  const directLen = direct?.length ?? 0;
-  const mdLen = scraped.markdown?.length ?? 0;
-  if (directLen === 0 && mdLen === 0) {
-    return { text: null, source: 'none', screenshot: scraped.screenshot };
+  const candidates: { text: string; source: 'direct' | 'firecrawl' }[] = [];
+  if (direct && direct.length >= MIN_MARKDOWN_LENGTH) {
+    candidates.push({ text: direct, source: 'direct' });
   }
-  if (directLen >= mdLen) {
-    return { text: direct, source: 'direct', screenshot: scraped.screenshot };
+  if (scraped.markdown && scraped.markdown.length >= MIN_MARKDOWN_LENGTH) {
+    candidates.push({ text: scraped.markdown, source: 'firecrawl' });
   }
-  return { text: scraped.markdown, source: 'firecrawl', screenshot: scraped.screenshot };
+  return { candidates, screenshot: scraped.screenshot };
 }
+
 
 
 function buildPrompt(name: string, todayStr: string): string {
