@@ -1199,12 +1199,20 @@ Deno.serve(async (req) => {
             }
           }
 
-          // Fall back to Firecrawl scraping
+          // Fall back to page scraping (direct HTML, then Firecrawl markdown/vision)
           if (dishes.length === 0) {
-            const { markdown, screenshot } = await scrapeUrl(r.menu_url, firecrawlKey);
+            const { text: pageText, source: textSource, screenshot } = await collectPageContent(
+              r.menu_url,
+              firecrawlKey,
+            );
+            console.log(
+              `Daily source ${r.name}: source=${textSource}, chars=${pageText?.length ?? 0}, sample=${
+                (pageText ?? '').slice(0, 300).replace(/\s+/g, ' ')
+              }`,
+            );
 
-            if (markdown && markdown.length >= MIN_MARKDOWN_LENGTH) {
-              dishes = await extractMenuFromText(r.name, markdown, lovableKey, todayKey);
+            if (pageText && pageText.length >= MIN_MARKDOWN_LENGTH) {
+              dishes = await extractMenuFromText(r.name, pageText, lovableKey, todayKey);
             }
 
             if (dishes.length === 0 && screenshot) {
@@ -1212,10 +1220,11 @@ Deno.serve(async (req) => {
               dishes = await extractMenuFromScreenshot(r.name, screenshot, lovableKey, todayKey);
             }
 
-            if (dishes.length === 0 && !markdown && !screenshot) {
+            if (dishes.length === 0 && !pageText && !screenshot) {
               console.log(`No content scraped for ${r.name}`);
             }
           }
+
 
           // If the scrape produced no dishes, keep the last known menu for this
           // restaurant (don't bump updatedAt). The response layer will mark it
