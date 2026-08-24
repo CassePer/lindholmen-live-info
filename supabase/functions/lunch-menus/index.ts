@@ -143,7 +143,7 @@ async function scrapeUrl(url: string, firecrawlKey: string): Promise<ScrapeResul
       body: JSON.stringify({
         url,
         formats: ['markdown', 'screenshot@fullPage'],
-        onlyMainContent: true,
+        onlyMainContent: false,
         waitFor: 5000,
         timeout: 30000,
       }),
@@ -161,6 +161,71 @@ async function scrapeUrl(url: string, firecrawlKey: string): Promise<ScrapeResul
     return { markdown: null, screenshot: null };
   }
 }
+
+/** Direct HTML fetch → plain text. Works for server-rendered menu pages. */
+async function fetchPageText(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (compatible; LindholmenLunchBot/1.0; +https://lindholmen-live-info.lovable.app)',
+        Accept: 'text/html,application/xhtml+xml',
+      },
+    });
+    if (!res.ok) {
+      console.error(`Direct fetch failed for ${url}: ${res.status}`);
+      return null;
+    }
+    const html = await res.text();
+    const text = html
+      .replace(/<!--[\s\S]*?-->/g, ' ')
+      .replace(/<(script|style|noscript|svg)[^>]*>[\s\S]*?<\/\1>/gi, ' ')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(p|div|li|tr|h[1-6]|section|article)>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#0?39;|&apos;/gi, "'")
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/[ \t\u00a0]+/g, ' ')
+      .replace(/\n\s*\n\s*\n+/g, '\n\n')
+      .trim();
+    return text.length > 0 ? text : null;
+  } catch (err) {
+    console.error(`Direct fetch error for ${url}:`, err);
+    return null;
+  }
+}
+
+/**
+ * Collect candidate page texts. Direct HTML fetch is tried first (it keeps the
+ * full menu markup for server-rendered pages), Firecrawl markdown second
+ * (needed for JS-rendered pages). The screenshot powers the vision fallback.
+ */
+async function collectPageContent(
+  url: string,
+  firecrawlKey: string,
+): Promise<{
+  candidates: { text: string; source: 'direct' | 'firecrawl' }[];
+  screenshot: string | null;
+}> {
+  const [direct, scraped] = await Promise.all([
+    fetchPageText(url),
+    scrapeUrl(url, firecrawlKey),
+  ]);
+  const candidates: { text: string; source: 'direct' | 'firecrawl' }[] = [];
+  if (direct && direct.length >= MIN_MARKDOWN_LENGTH) {
+    candidates.push({ text: direct, source: 'direct' });
+  }
+  if (scraped.markdown && scraped.markdown.length >= MIN_MARKDOWN_LENGTH) {
+    candidates.push({ text: scraped.markdown, source: 'firecrawl' });
+  }
+  return { candidates, screenshot: scraped.screenshot };
+}
+
+
 
 function buildPrompt(name: string, todayStr: string): string {
   const dayNames = ['söndag', 'måndag', 'tisdag', 'onsdag', 'torsdag', 'fredag', 'lördag'];
@@ -1030,15 +1095,26 @@ Deno.serve(async (req) => {
               // Reuse this week's cached weekly menu — no scrape, no cache write.
               return { ...weeklyToTodayMenu(cachedWeekly, now, todayKey), _substituted: true };
             }
-            // Scrape full page and extract structured per-day menu
-            const { markdown, screenshot } = await scrapeUrl(r.menu_url, firecrawlKey);
+            // Collect page text (direct HTML first, Firecrawl markdown as alternative)
+            const { candidates, screenshot } = await collectPageContent(r.menu_url, firecrawlKey);
             let byDay: Record<string, { name: string; tags?: string[] }[]> | null = null;
-            if (markdown && markdown.length >= MIN_MARKDOWN_LENGTH) {
-              byDay = await extractWeeklyMenuFromText(r.name, markdown, lovableKey, todayKey);
-              if (byDay) {
-                for (const k of Object.keys(byDay)) {
-                  byDay[k] = dedupeDishes(byDay[k] ?? []);
+            let usedSource = 'none';
+            for (const cand of candidates) {
+              console.log(
+                `Weekly source ${r.name}: source=${cand.source}, chars=${cand.text.length}, sample=${
+                  cand.text.slice(0, 200).replace(/\s+/g, ' ')
+                }`,
+              );
+              const result = await extractWeeklyMenuFromText(r.name, cand.text, lovableKey, todayKey);
+              if (result) {
+                for (const k of Object.keys(result)) {
+                  result[k] = dedupeDishes(result[k] ?? []);
                 }
+              }
+              if (result && weeklyHasAnyDishes(result)) {
+                byDay = result;
+                usedSource = cand.source;
+                break;
               }
             }
             if ((!byDay || !weeklyHasAnyDishes(byDay)) && screenshot) {
@@ -1053,14 +1129,19 @@ Deno.serve(async (req) => {
                 for (const k of Object.keys(visionByDay)) {
                   visionByDay[k] = dedupeDishes(visionByDay[k] ?? []);
                 }
-                if (weeklyHasAnyDishes(visionByDay)) byDay = visionByDay;
+                if (weeklyHasAnyDishes(visionByDay)) {
+                  byDay = visionByDay;
+                  usedSource = 'vision';
+                }
               }
             }
             console.log(
-              `Weekly scrape ${r.name}: markdown=${markdown?.length ?? 0} chars, byDay=${
+              `Weekly scrape ${r.name}: source=${usedSource}, byDay=${
                 byDay ? JSON.stringify(Object.fromEntries(Object.entries(byDay).map(([k, v]) => [k, (v ?? []).length]))) : 'null'
               }`,
             );
+
+
             if (!byDay || !weeklyHasAnyDishes(byDay)) {
               // Fallback: keep previously known menu (today's view) for this restaurant
               const prev = latestByRestaurant.get(r.id);
@@ -1128,12 +1209,18 @@ Deno.serve(async (req) => {
             }
           }
 
-          // Fall back to Firecrawl scraping
+          // Fall back to page scraping (direct HTML, then Firecrawl markdown/vision)
           if (dishes.length === 0) {
-            const { markdown, screenshot } = await scrapeUrl(r.menu_url, firecrawlKey);
+            const { candidates, screenshot } = await collectPageContent(r.menu_url, firecrawlKey);
 
-            if (markdown && markdown.length >= MIN_MARKDOWN_LENGTH) {
-              dishes = await extractMenuFromText(r.name, markdown, lovableKey, todayKey);
+            for (const cand of candidates) {
+              console.log(
+                `Daily source ${r.name}: source=${cand.source}, chars=${cand.text.length}, sample=${
+                  cand.text.slice(0, 200).replace(/\s+/g, ' ')
+                }`,
+              );
+              dishes = await extractMenuFromText(r.name, cand.text, lovableKey, todayKey);
+              if (dishes.length > 0) break;
             }
 
             if (dishes.length === 0 && screenshot) {
@@ -1141,10 +1228,12 @@ Deno.serve(async (req) => {
               dishes = await extractMenuFromScreenshot(r.name, screenshot, lovableKey, todayKey);
             }
 
-            if (dishes.length === 0 && !markdown && !screenshot) {
+            if (dishes.length === 0 && candidates.length === 0 && !screenshot) {
               console.log(`No content scraped for ${r.name}`);
             }
+
           }
+
 
           // If the scrape produced no dishes, keep the last known menu for this
           // restaurant (don't bump updatedAt). The response layer will mark it
