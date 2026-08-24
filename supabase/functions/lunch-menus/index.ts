@@ -143,7 +143,7 @@ async function scrapeUrl(url: string, firecrawlKey: string): Promise<ScrapeResul
       body: JSON.stringify({
         url,
         formats: ['markdown', 'screenshot@fullPage'],
-        onlyMainContent: true,
+        onlyMainContent: false,
         waitFor: 5000,
         timeout: 30000,
       }),
@@ -161,6 +161,68 @@ async function scrapeUrl(url: string, firecrawlKey: string): Promise<ScrapeResul
     return { markdown: null, screenshot: null };
   }
 }
+
+/** Direct HTML fetch → plain text. Works for server-rendered menu pages. */
+async function fetchPageText(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (compatible; LindholmenLunchBot/1.0; +https://lindholmen-live-info.lovable.app)',
+        Accept: 'text/html,application/xhtml+xml',
+      },
+    });
+    if (!res.ok) {
+      console.error(`Direct fetch failed for ${url}: ${res.status}`);
+      return null;
+    }
+    const html = await res.text();
+    const text = html
+      .replace(/<!--[\s\S]*?-->/g, ' ')
+      .replace(/<(script|style|noscript|svg)[^>]*>[\s\S]*?<\/\1>/gi, ' ')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(p|div|li|tr|h[1-6]|section|article)>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#0?39;|&apos;/gi, "'")
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/[ \t\u00a0]+/g, ' ')
+      .replace(/\n\s*\n\s*\n+/g, '\n\n')
+      .trim();
+    return text.length > 0 ? text : null;
+  } catch (err) {
+    console.error(`Direct fetch error for ${url}:`, err);
+    return null;
+  }
+}
+
+/**
+ * Collect page text from the best available source:
+ * direct HTML fetch first, Firecrawl markdown when it yields more text.
+ * Screenshot (for vision fallback) always comes from Firecrawl.
+ */
+async function collectPageContent(
+  url: string,
+  firecrawlKey: string,
+): Promise<{ text: string | null; source: 'direct' | 'firecrawl' | 'none'; screenshot: string | null }> {
+  const [direct, scraped] = await Promise.all([
+    fetchPageText(url),
+    scrapeUrl(url, firecrawlKey),
+  ]);
+  const directLen = direct?.length ?? 0;
+  const mdLen = scraped.markdown?.length ?? 0;
+  if (directLen === 0 && mdLen === 0) {
+    return { text: null, source: 'none', screenshot: scraped.screenshot };
+  }
+  if (directLen >= mdLen) {
+    return { text: direct, source: 'direct', screenshot: scraped.screenshot };
+  }
+  return { text: scraped.markdown, source: 'firecrawl', screenshot: scraped.screenshot };
+}
+
 
 function buildPrompt(name: string, todayStr: string): string {
   const dayNames = ['söndag', 'måndag', 'tisdag', 'onsdag', 'torsdag', 'fredag', 'lördag'];
