@@ -1096,22 +1096,25 @@ Deno.serve(async (req) => {
               return { ...weeklyToTodayMenu(cachedWeekly, now, todayKey), _substituted: true };
             }
             // Collect page text (direct HTML first, Firecrawl markdown as alternative)
-            const { text: pageText, source: textSource, screenshot } = await collectPageContent(
-              r.menu_url,
-              firecrawlKey,
-            );
-            console.log(
-              `Weekly source ${r.name}: source=${textSource}, chars=${pageText?.length ?? 0}, sample=${
-                (pageText ?? '').slice(0, 300).replace(/\s+/g, ' ')
-              }`,
-            );
+            const { candidates, screenshot } = await collectPageContent(r.menu_url, firecrawlKey);
             let byDay: Record<string, { name: string; tags?: string[] }[]> | null = null;
-            if (pageText && pageText.length >= MIN_MARKDOWN_LENGTH) {
-              byDay = await extractWeeklyMenuFromText(r.name, pageText, lovableKey, todayKey);
-              if (byDay) {
-                for (const k of Object.keys(byDay)) {
-                  byDay[k] = dedupeDishes(byDay[k] ?? []);
+            let usedSource = 'none';
+            for (const cand of candidates) {
+              console.log(
+                `Weekly source ${r.name}: source=${cand.source}, chars=${cand.text.length}, sample=${
+                  cand.text.slice(0, 200).replace(/\s+/g, ' ')
+                }`,
+              );
+              const result = await extractWeeklyMenuFromText(r.name, cand.text, lovableKey, todayKey);
+              if (result) {
+                for (const k of Object.keys(result)) {
+                  result[k] = dedupeDishes(result[k] ?? []);
                 }
+              }
+              if (result && weeklyHasAnyDishes(result)) {
+                byDay = result;
+                usedSource = cand.source;
+                break;
               }
             }
             if ((!byDay || !weeklyHasAnyDishes(byDay)) && screenshot) {
@@ -1126,14 +1129,18 @@ Deno.serve(async (req) => {
                 for (const k of Object.keys(visionByDay)) {
                   visionByDay[k] = dedupeDishes(visionByDay[k] ?? []);
                 }
-                if (weeklyHasAnyDishes(visionByDay)) byDay = visionByDay;
+                if (weeklyHasAnyDishes(visionByDay)) {
+                  byDay = visionByDay;
+                  usedSource = 'vision';
+                }
               }
             }
             console.log(
-              `Weekly scrape ${r.name}: text=${pageText?.length ?? 0} chars (${textSource}), byDay=${
+              `Weekly scrape ${r.name}: source=${usedSource}, byDay=${
                 byDay ? JSON.stringify(Object.fromEntries(Object.entries(byDay).map(([k, v]) => [k, (v ?? []).length]))) : 'null'
               }`,
             );
+
 
             if (!byDay || !weeklyHasAnyDishes(byDay)) {
               // Fallback: keep previously known menu (today's view) for this restaurant
