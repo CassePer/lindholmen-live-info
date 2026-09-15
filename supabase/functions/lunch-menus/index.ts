@@ -1128,8 +1128,15 @@ Deno.serve(async (req) => {
               // Reuse this week's cached weekly menu — no scrape, no cache write.
               return { ...weeklyToTodayMenu(cachedWeekly, now, todayKey), _substituted: true };
             }
-            // Collect page text (direct HTML first, Firecrawl markdown as alternative)
+            // Collect page text (weekly RSS feed first, then direct HTML, then Firecrawl markdown)
             const { candidates, screenshot } = await collectPageContent(r.menu_url, firecrawlKey);
+            const weeklyRssUrl = r.rss_url ? getCompassGroupUrls(r.rss_url)?.weeklyRss : null;
+            if (weeklyRssUrl) {
+              const rssWeekText = await fetchRssWeeklyText(weeklyRssUrl);
+              if (rssWeekText && rssWeekText.length > 100) {
+                candidates.unshift({ source: 'weekly-rss', text: rssWeekText });
+              }
+            }
             let byDay: Record<string, { name: string; tags?: string[] }[]> | null = null;
             let usedSource = 'none';
             for (const cand of candidates) {
