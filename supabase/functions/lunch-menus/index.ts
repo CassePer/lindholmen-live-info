@@ -616,6 +616,39 @@ async function fetchRssMenu(rssUrl: string, todayStr: string): Promise<string | 
   }
 }
 
+/**
+ * Fetch a weekly RSS feed (one <item> per weekday) and build a single
+ * text blob with explicit day headings — ideal input for weekly extraction.
+ */
+async function fetchRssWeeklyText(rssUrl: string): Promise<string | null> {
+  try {
+    const res = await fetch(rssUrl);
+    if (!res.ok) {
+      console.error(`Weekly RSS fetch failed: ${res.status}`);
+      return null;
+    }
+    const xml = await res.text();
+    const items = xml.split('<item>').slice(1);
+    const parts: string[] = [];
+    for (const item of items) {
+      const titleMatch = item.match(/<title>([\s\S]*?)<\/title>/);
+      const cdataMatch = item.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/);
+      const plainMatch = item.match(/<description>([\s\S]*?)<\/description>/);
+      const desc = cdataMatch ? cdataMatch[1] : plainMatch ? plainMatch[1] : '';
+      if (!desc) continue;
+      const title = titleMatch ? decodeRssHtml(titleMatch[1]) : '';
+      const body = decodeRssHtml(desc);
+      if (body.length < 10) continue;
+      parts.push(`${title}\n${body}`);
+    }
+    if (parts.length === 0) return null;
+    return parts.join('\n\n');
+  } catch (err) {
+    console.error('Weekly RSS fetch error:', err);
+    return null;
+  }
+}
+
 function decodeRssHtml(desc: string): string {
   return desc
     .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
