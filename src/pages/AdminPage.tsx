@@ -222,9 +222,8 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
   const [lunchWindowEnd, setLunchWindowEnd] = useState<string | null>(null);
   const [tvIpRange, setTvIpRange] = useState<string | null>(null);
   const [tvIframeUrl, setTvIframeUrl] = useState<string | null>(null);
-  const [stopBus, setStopBus] = useState<string | null>(null);
-  const [stopTram, setStopTram] = useState<string | null>(null);
-  const [stopFerry, setStopFerry] = useState<string | null>(null);
+  // Stopp-ID:n hanteras inte längre i Admin — inbyggda standardvärden i avgångsfunktionen.
+
 
   const currentIntervalSec = parseInt(refreshInterval ?? settings?.departure_refresh_interval ?? "60", 10);
   const currentIntervalMin = String(Math.round(currentIntervalSec / 60) || 1);
