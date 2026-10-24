@@ -447,26 +447,19 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
           <CardContent className="space-y-4">
             <div>
               <label className="text-sm font-medium mb-1 block">Buss – hållplats-ID</label>
-              <div className="flex gap-2">
-                <Input value={currentStopBus} onChange={(e) => setStopBus(e.target.value)} className="w-48" placeholder="740059410" />
-                <Button size="sm" onClick={() => saveSettingMutation.mutate({ key: "departure_stop_bus", value: currentStopBus })} disabled={saveSettingMutation.isPending}>Spara</Button>
-              </div>
+              <Input value={currentStopBus} disabled className="w-48" placeholder="740059410" />
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">Spårvagn – hållplats-ID</label>
-              <div className="flex gap-2">
-                <Input value={currentStopTram} onChange={(e) => setStopTram(e.target.value)} className="w-48" placeholder="740059410" />
-                <Button size="sm" onClick={() => saveSettingMutation.mutate({ key: "departure_stop_tram", value: currentStopTram })} disabled={saveSettingMutation.isPending}>Spara</Button>
-              </div>
+              <Input value={currentStopTram} disabled className="w-48" placeholder="740059410" />
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">Färja – hållplats-ID</label>
-              <div className="flex gap-2">
-                <Input value={currentStopFerry} onChange={(e) => setStopFerry(e.target.value)} className="w-48" placeholder="740059412" />
-                <Button size="sm" onClick={() => saveSettingMutation.mutate({ key: "departure_stop_ferry", value: currentStopFerry })} disabled={saveSettingMutation.isPending}>Spara</Button>
-              </div>
+              <Input value={currentStopFerry} disabled className="w-48" placeholder="740059412" />
             </div>
-            <p className="text-xs text-muted-foreground">Hållplats-IDs från Trafiklab (t.ex. 740059410 = Lindholmen).</p>
+            <p className="text-xs text-muted-foreground">
+              Fälten är inaktiverade eftersom avgångsfunktionen numera använder inbyggda standard-stopp-ID:n (t.ex. 740059410 = Lindholmen, 740059412 = Lindholmspiren) direkt i koden, istället för att läsa dessa värden från databasen vid varje uppdatering. För att kunna hantera stopp-ID:n här igen krävs en ombyggnad av funktionen, vilket återinför ett databasanrop per hämtning.
+            </p>
 
             <div className="border-t pt-3 mt-2">
               <p className="text-sm font-medium mb-2 flex items-center gap-2"><Eye className="h-4 w-4" /> Visa transportslag</p>
