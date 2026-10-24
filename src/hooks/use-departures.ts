@@ -1,10 +1,17 @@
+import { useEffect, useReducer } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getDepartures } from "@/services/departures";
 import { useAppSettings } from "@/hooks/use-app-settings";
+import { usePageVisible } from "@/hooks/use-page-visible";
+import { shouldAutoRefresh } from "@/lib/refresh-gate";
 
-function isWeekend() {
-  const day = new Date().getDay();
-  return day === 0 || day === 6;
+/** Re-evaluates the refresh gate every minute so hour-boundary transitions take effect. */
+function useMinuteTick() {
+  const [, tick] = useReducer((x: number) => x + 1, 0);
+  useEffect(() => {
+    const id = setInterval(tick, 60_000);
+    return () => clearInterval(id);
+  }, []);
 }
 
 export function useDepartures() {
@@ -13,13 +20,21 @@ export function useDepartures() {
     ? parseInt(settings.departure_refresh_interval, 10)
     : 60;
   const updateWeekends = settings?.departure_update_weekends !== "false";
+  const visible = usePageVisible();
+  useMinuteTick();
 
-  const shouldRefresh = updateWeekends || !isWeekend();
+  const active = shouldAutoRefresh({
+    updateWeekends,
+    activeStart: settings?.departure_active_hours_start ?? "6",
+    activeEnd: settings?.departure_active_hours_end ?? "22",
+    visibilityState: visible ? "visible" : "hidden",
+  });
 
   return useQuery({
     queryKey: ["departures"],
     queryFn: () => getDepartures(),
-    refetchInterval: shouldRefresh ? intervalSec * 1000 : false,
+    refetchInterval: active ? intervalSec * 1000 : false,
+    refetchIntervalInBackground: false,
     staleTime: 10_000,
   });
 }

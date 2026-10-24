@@ -240,9 +240,14 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
   const currentLunchWindowEnd = lunchWindowEnd ?? settings?.lunch_fetch_window_end ?? "14";
   const hideRefreshWhenComplete = settings?.lunch_hide_refresh_when_complete !== "false";
   const weekViewEnabled = settings?.lunch_week_view_enabled !== "false";
-  const currentStopBus = settings?.departure_stop_bus ?? "740059410";
-  const currentStopTram = settings?.departure_stop_tram ?? "740059410";
-  const currentStopFerry = settings?.departure_stop_ferry ?? "740059412";
+  const [depActiveStart, setDepActiveStart] = useState<string | null>(null);
+  const [depActiveEnd, setDepActiveEnd] = useState<string | null>(null);
+  const [camActiveStart, setCamActiveStart] = useState<string | null>(null);
+  const [camActiveEnd, setCamActiveEnd] = useState<string | null>(null);
+  const currentDepActiveStart = depActiveStart ?? settings?.departure_active_hours_start ?? "6";
+  const currentDepActiveEnd = depActiveEnd ?? settings?.departure_active_hours_end ?? "22";
+  const currentCamActiveStart = camActiveStart ?? settings?.camera_active_hours_start ?? "6";
+  const currentCamActiveEnd = camActiveEnd ?? settings?.camera_active_hours_end ?? "22";
   const showBus = settings?.departure_show_bus !== "false";
   const showTram = settings?.departure_show_tram !== "false";
   const showFerry = settings?.departure_show_ferry !== "false";
@@ -445,20 +450,52 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <label className="text-sm font-medium mb-1 block">Buss – hållplats-ID</label>
-              <Input value={currentStopBus} disabled className="w-48" placeholder="740059410" />
+              <p className="text-sm font-medium mb-2">Aktiva standard-stopp-ID:n (skrivskyddat)</p>
+              <dl className="text-sm space-y-1 rounded-md border bg-muted/40 p-3">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">Buss & Spårvagn</dt>
+                  <dd className="font-mono">740059410 – Lindholmen</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">Färja</dt>
+                  <dd className="font-mono">740059412 – Lindholmspiren</dd>
+                </div>
+              </dl>
+              <p className="text-xs text-muted-foreground mt-1">
+                Dessa är de stopp-ID:n avgångsfunktionen faktiskt använder. De är inbyggda direkt i koden istället för att läsas från databasen vid varje uppdatering. För att kunna hantera stopp-ID:n här igen krävs en ombyggnad av funktionen, vilket återinför ett databasanrop per hämtning.
+              </p>
             </div>
-            <div>
-              <label className="text-sm font-medium mb-1 block">Spårvagn – hållplats-ID</label>
-              <Input value={currentStopTram} disabled className="w-48" placeholder="740059410" />
+
+            <div className="border-t pt-3 mt-2">
+              <p className="text-sm font-medium mb-2">Aktiva timmar – automatisk uppdatering</p>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm mb-1 block">Avgångar (timmar 0–23)</label>
+                  <div className="flex items-center gap-2">
+                    <Input type="number" min="0" max="23" value={currentDepActiveStart} onChange={(e) => setDepActiveStart(e.target.value)} className="w-20" />
+                    <span className="text-sm text-muted-foreground">till</span>
+                    <Input type="number" min="0" max="23" value={currentDepActiveEnd} onChange={(e) => setDepActiveEnd(e.target.value)} className="w-20" />
+                    <Button size="sm" onClick={() => { saveSettingMutation.mutate({ key: "departure_active_hours_start", value: currentDepActiveStart }); saveSettingMutation.mutate({ key: "departure_active_hours_end", value: currentDepActiveEnd }); }} disabled={saveSettingMutation.isPending}>
+                      {saveSettingMutation.isPending ? "Sparar..." : "Spara"}
+                    </Button>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm mb-1 block">Kameror (timmar 0–23)</label>
+                  <div className="flex items-center gap-2">
+                    <Input type="number" min="0" max="23" value={currentCamActiveStart} onChange={(e) => setCamActiveStart(e.target.value)} className="w-20" />
+                    <span className="text-sm text-muted-foreground">till</span>
+                    <Input type="number" min="0" max="23" value={currentCamActiveEnd} onChange={(e) => setCamActiveEnd(e.target.value)} className="w-20" />
+                    <Button size="sm" onClick={() => { saveSettingMutation.mutate({ key: "camera_active_hours_start", value: currentCamActiveStart }); saveSettingMutation.mutate({ key: "camera_active_hours_end", value: currentCamActiveEnd }); }} disabled={saveSettingMutation.isPending}>
+                      {saveSettingMutation.isPending ? "Sparar..." : "Spara"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Automatiska uppdateringar sker bara inom dessa timmar och bara när fliken är synlig. Tomma fält eller samma start- och sluttid = dygnet runt.
+              </p>
             </div>
-            <div>
-              <label className="text-sm font-medium mb-1 block">Färja – hållplats-ID</label>
-              <Input value={currentStopFerry} disabled className="w-48" placeholder="740059412" />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Fälten är inaktiverade eftersom avgångsfunktionen numera använder inbyggda standard-stopp-ID:n (t.ex. 740059410 = Lindholmen, 740059412 = Lindholmspiren) direkt i koden, istället för att läsa dessa värden från databasen vid varje uppdatering. För att kunna hantera stopp-ID:n här igen krävs en ombyggnad av funktionen, vilket återinför ett databasanrop per hämtning.
-            </p>
 
             <div className="border-t pt-3 mt-2">
               <p className="text-sm font-medium mb-2 flex items-center gap-2"><Eye className="h-4 w-4" /> Visa transportslag</p>
