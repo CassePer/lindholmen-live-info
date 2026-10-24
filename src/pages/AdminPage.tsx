@@ -240,9 +240,14 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
   const currentLunchWindowEnd = lunchWindowEnd ?? settings?.lunch_fetch_window_end ?? "14";
   const hideRefreshWhenComplete = settings?.lunch_hide_refresh_when_complete !== "false";
   const weekViewEnabled = settings?.lunch_week_view_enabled !== "false";
-  const currentStopBus = settings?.departure_stop_bus ?? "740059410";
-  const currentStopTram = settings?.departure_stop_tram ?? "740059410";
-  const currentStopFerry = settings?.departure_stop_ferry ?? "740059412";
+  const [depActiveStart, setDepActiveStart] = useState<string | null>(null);
+  const [depActiveEnd, setDepActiveEnd] = useState<string | null>(null);
+  const [camActiveStart, setCamActiveStart] = useState<string | null>(null);
+  const [camActiveEnd, setCamActiveEnd] = useState<string | null>(null);
+  const currentDepActiveStart = depActiveStart ?? settings?.departure_active_hours_start ?? "6";
+  const currentDepActiveEnd = depActiveEnd ?? settings?.departure_active_hours_end ?? "22";
+  const currentCamActiveStart = camActiveStart ?? settings?.camera_active_hours_start ?? "6";
+  const currentCamActiveEnd = camActiveEnd ?? settings?.camera_active_hours_end ?? "22";
   const showBus = settings?.departure_show_bus !== "false";
   const showTram = settings?.departure_show_tram !== "false";
   const showFerry = settings?.departure_show_ferry !== "false";
