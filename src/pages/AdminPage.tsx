@@ -222,9 +222,8 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
   const [lunchWindowEnd, setLunchWindowEnd] = useState<string | null>(null);
   const [tvIpRange, setTvIpRange] = useState<string | null>(null);
   const [tvIframeUrl, setTvIframeUrl] = useState<string | null>(null);
-  const [stopBus, setStopBus] = useState<string | null>(null);
-  const [stopTram, setStopTram] = useState<string | null>(null);
-  const [stopFerry, setStopFerry] = useState<string | null>(null);
+  // Stopp-ID:n hanteras inte längre i Admin — inbyggda standardvärden i avgångsfunktionen.
+
 
   const currentIntervalSec = parseInt(refreshInterval ?? settings?.departure_refresh_interval ?? "60", 10);
   const currentIntervalMin = String(Math.round(currentIntervalSec / 60) || 1);
@@ -241,9 +240,9 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
   const currentLunchWindowEnd = lunchWindowEnd ?? settings?.lunch_fetch_window_end ?? "14";
   const hideRefreshWhenComplete = settings?.lunch_hide_refresh_when_complete !== "false";
   const weekViewEnabled = settings?.lunch_week_view_enabled !== "false";
-  const currentStopBus = stopBus ?? settings?.departure_stop_bus ?? "740059410";
-  const currentStopTram = stopTram ?? settings?.departure_stop_tram ?? "740059410";
-  const currentStopFerry = stopFerry ?? settings?.departure_stop_ferry ?? "740059412";
+  const currentStopBus = settings?.departure_stop_bus ?? "740059410";
+  const currentStopTram = settings?.departure_stop_tram ?? "740059410";
+  const currentStopFerry = settings?.departure_stop_ferry ?? "740059412";
   const showBus = settings?.departure_show_bus !== "false";
   const showTram = settings?.departure_show_tram !== "false";
   const showFerry = settings?.departure_show_ferry !== "false";
@@ -447,26 +446,19 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
           <CardContent className="space-y-4">
             <div>
               <label className="text-sm font-medium mb-1 block">Buss – hållplats-ID</label>
-              <div className="flex gap-2">
-                <Input value={currentStopBus} onChange={(e) => setStopBus(e.target.value)} className="w-48" placeholder="740059410" />
-                <Button size="sm" onClick={() => saveSettingMutation.mutate({ key: "departure_stop_bus", value: currentStopBus })} disabled={saveSettingMutation.isPending}>Spara</Button>
-              </div>
+              <Input value={currentStopBus} disabled className="w-48" placeholder="740059410" />
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">Spårvagn – hållplats-ID</label>
-              <div className="flex gap-2">
-                <Input value={currentStopTram} onChange={(e) => setStopTram(e.target.value)} className="w-48" placeholder="740059410" />
-                <Button size="sm" onClick={() => saveSettingMutation.mutate({ key: "departure_stop_tram", value: currentStopTram })} disabled={saveSettingMutation.isPending}>Spara</Button>
-              </div>
+              <Input value={currentStopTram} disabled className="w-48" placeholder="740059410" />
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">Färja – hållplats-ID</label>
-              <div className="flex gap-2">
-                <Input value={currentStopFerry} onChange={(e) => setStopFerry(e.target.value)} className="w-48" placeholder="740059412" />
-                <Button size="sm" onClick={() => saveSettingMutation.mutate({ key: "departure_stop_ferry", value: currentStopFerry })} disabled={saveSettingMutation.isPending}>Spara</Button>
-              </div>
+              <Input value={currentStopFerry} disabled className="w-48" placeholder="740059412" />
             </div>
-            <p className="text-xs text-muted-foreground">Hållplats-IDs från Trafiklab (t.ex. 740059410 = Lindholmen).</p>
+            <p className="text-xs text-muted-foreground">
+              Fälten är inaktiverade eftersom avgångsfunktionen numera använder inbyggda standard-stopp-ID:n (t.ex. 740059410 = Lindholmen, 740059412 = Lindholmspiren) direkt i koden, istället för att läsa dessa värden från databasen vid varje uppdatering. För att kunna hantera stopp-ID:n här igen krävs en ombyggnad av funktionen, vilket återinför ett databasanrop per hämtning.
+            </p>
 
             <div className="border-t pt-3 mt-2">
               <p className="text-sm font-medium mb-2 flex items-center gap-2"><Eye className="h-4 w-4" /> Visa transportslag</p>
