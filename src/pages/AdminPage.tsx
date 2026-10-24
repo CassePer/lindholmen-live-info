@@ -240,9 +240,9 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
   const currentLunchWindowEnd = lunchWindowEnd ?? settings?.lunch_fetch_window_end ?? "14";
   const hideRefreshWhenComplete = settings?.lunch_hide_refresh_when_complete !== "false";
   const weekViewEnabled = settings?.lunch_week_view_enabled !== "false";
-  const currentStopBus = stopBus ?? settings?.departure_stop_bus ?? "740059410";
-  const currentStopTram = stopTram ?? settings?.departure_stop_tram ?? "740059410";
-  const currentStopFerry = stopFerry ?? settings?.departure_stop_ferry ?? "740059412";
+  const currentStopBus = settings?.departure_stop_bus ?? "740059410";
+  const currentStopTram = settings?.departure_stop_tram ?? "740059410";
+  const currentStopFerry = settings?.departure_stop_ferry ?? "740059412";
   const showBus = settings?.departure_show_bus !== "false";
   const showTram = settings?.departure_show_tram !== "false";
   const showFerry = settings?.departure_show_ferry !== "false";
