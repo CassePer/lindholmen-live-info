@@ -196,6 +196,8 @@ export default function CamerasPage({ embedded }: { embedded?: boolean }) {
         </AnimatePresence>
 
         <p className="text-xs text-muted-foreground text-center pt-4 pb-8">
+          Kamerabilder hämtas från Trafikverkets öppna data (api.trafikinfo.trafikverket.se).
+          <br />
           Uppdateras var 3:e minut.
         </p>
       </div>
