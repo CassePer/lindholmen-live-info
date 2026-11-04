@@ -53,4 +53,6 @@ Ingen automatisk fallback till databasen görs i aktiverad statisk drift. Saknas
 
 ## Status
 
+GitHub-kontroll den 4 november 2026: `Publicera lunchmenyer` finns och är active i det privata repositoryt `CassePer/lindholmen-live-info`. Inga repositorysecrets är registrerade. Försök att skapa Pages nekades med HTTP 422: GitHub-abonnemanget stöder inte Pages för detta repository. Repositoryt har inte gjorts offentligt. Aktivering kräver ett passande GitHub-abonnemang eller en separat godkänd publiceringsyta samt nödvändiga serverhemligheter.
+
 Lokala tester täcker menydatum, veckor, exportfält, skrivskyddade anrop och TV-sekretess. GitHub-jobb, Pages, externa serverhemligheter, rate limiting och verklig databasfri drift måste konfigureras och verifieras externt; de är inte klara bara för att koden finns.
