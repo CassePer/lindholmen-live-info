@@ -27,4 +27,8 @@ describe("statiska lunchmenyer", () => {
     expect(() => sanitizeDocument({ ...document, restaurants: [{ ...document.restaurants[0], restaurantName: "<script>" }] })).toThrow();
     expect(() => sanitizeDocument({ ...document, restaurants: [{ ...document.restaurants[0], sourceUrl: "https://user:password@bistrot.se/" }] })).toThrow();
   });
+  it("avvisar kalenderdatum som inte existerar", () => {
+    expect(() => sanitizeDocument({ ...document, restaurants: [{ ...document.restaurants[0], weekStart: "2026-02-30" }] })).toThrow();
+    expect(() => sanitizeDocument({ ...document, generatedAt: "2026-02-30T09:00:00Z" })).toThrow();
+  });
 });

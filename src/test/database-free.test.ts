@@ -2,8 +2,14 @@ import { describe, it, expect, vi } from "vitest";
 import { databaseFreeReady } from "../lib/deployment-mode";
 import { canScrape, mayRefresh } from "../../scripts/lunch/policy";
 import worker, { isTvIp } from "../../worker/index";
+import { safeCameraUrl } from "../../worker/cameras";
 
 describe("säker drift utan databas", () => {
+  it("lämnar endast godkända HTTPS-kameralänkar till klienten", () => {
+    expect(safeCameraUrl("https://example.org/camera.jpg")).toBe(false);
+    expect(safeCameraUrl("http://trafikverket.se/camera.jpg")).toBe(false);
+    expect(safeCameraUrl("https://trafikverket.se/camera.jpg")).toBe(true);
+  });
   it("byter inte drift innan båda HTTPS-adresserna finns", () => {
     expect(databaseFreeReady("static", "https://example.org", undefined)).toBe(false);
     expect(databaseFreeReady("static", "https://example.org", "http://example.org")).toBe(false);
