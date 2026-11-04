@@ -42,13 +42,20 @@ function publicUrl(value: unknown): string {
   if (url.protocol !== "https:" || url.username || url.password) throw new Error("Ogiltig källadress.");
   return text;
 }
+function validDateKey(value: string): boolean {
+  const date = new Date(`${value}T12:00:00Z`);
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+function validTimestamp(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/.test(value) && validDateKey(value.slice(0, 10)) && Number.isFinite(Date.parse(value));
+}
 /** Whitelist fields. Unknown metadata, credentials and raw pages are never exported. */
 export function sanitizeDocument(input: unknown): StaticLunchDocument {
   if (!input || typeof input !== "object") throw new Error("Ogiltig menyfil.");
   const obj = input as Record<string, unknown>;
   if (obj.schemaVersion !== 1 || !Array.isArray(obj.restaurants) || obj.restaurants.length > 20) throw new Error("Ogiltigt menyformat.");
   const generatedAt = safeText(obj.generatedAt, 40);
-  if (!Number.isFinite(Date.parse(generatedAt))) throw new Error("Ogiltig hämtningstid.");
+  if (!validTimestamp(generatedAt)) throw new Error("Ogiltig hämtningstid.");
   const seen = new Set<string>();
   const restaurants = obj.restaurants.map((entry: unknown): StaticRestaurant => {
     if (!entry || typeof entry !== "object") throw new Error("Ogiltig restaurang.");
@@ -57,9 +64,9 @@ export function sanitizeDocument(input: unknown): StaticLunchDocument {
     if (!restaurantId || seen.has(restaurantId)) throw new Error("Dubblett av restaurang.");
     seen.add(restaurantId);
     const weekStart = safeText(r.weekStart, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(weekStart) || new Date(`${weekStart}T12:00:00Z`).getUTCDay() !== 1) throw new Error("Ogiltig menyvecka.");
+    if (!validDateKey(weekStart) || new Date(`${weekStart}T12:00:00Z`).getUTCDay() !== 1) throw new Error("Ogiltig menyvecka.");
     const updatedAt = safeText(r.updatedAt, 40);
-    if (updatedAt && !Number.isFinite(Date.parse(updatedAt))) throw new Error("Ogiltig uppdateringstid.");
+    if (updatedAt && !validTimestamp(updatedAt)) throw new Error("Ogiltig uppdateringstid.");
     const byDay = r.dishesByDay as Record<string, unknown> | undefined;
     const dishesByDay = Object.fromEntries([...WEEK_DAYS, "week"].map((day) => {
       const dishes = byDay?.[day];

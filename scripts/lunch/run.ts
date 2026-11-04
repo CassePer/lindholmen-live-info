@@ -13,13 +13,17 @@ interface Progress { paused?: string; attempts: Record<string, string>; document
 const now = new Date();
 let state: Progress;
 try { state = JSON.parse(await readFile(`${folder}/state.json`, "utf8")); }
-catch { state = { attempts: {} }; }
+catch (error) {
+  if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") state = { attempts: {} };
+  else throw new Error("Ogiltig privat jobbstatus; manuell återställning krävs.");
+}
 await mkdir(folder, { recursive: true });
 async function save() {
   await writeFile(`${folder}/state.tmp`, JSON.stringify(state));
   await rename(`${folder}/state.tmp`, `${folder}/state.json`);
 }
 try {
+  if (!state.attempts || typeof state.attempts !== "object" || Object.values(state.attempts).some((value) => typeof value !== "string" || !Number.isFinite(Date.parse(value)))) throw new Error("Ogiltig försöksstatus; manuell återställning krävs.");
   if (process.env.LUNCH_RESUME === "true") state.paused = undefined;
   if (config.paused || state.paused) throw new Error("Jobbet är pausat. Kontrollera behörigheter och återuppta manuellt.");
   const monday = weekMonday(now);
@@ -54,7 +58,10 @@ try {
       if (!entry || !hasDishes(entry)) throw new Error("Ingen aktuell veckomeny hittades.");
       if (old?.weekStart === monday && WEEK_DAYS.some((day) => old.dishesByDay[day].length > 0 && entry.dishesByDay[day].length === 0)) throw new Error("En publicerad dagsmeny saknas i nya hämtningen.");
       results.push(entry);
-      state.document = { schemaVersion: 1, generatedAt: now.toISOString(), restaurants: [...existing.filter((r) => r.restaurantId !== entry.restaurantId), entry] };
+      const position = existing.findIndex((r) => r.restaurantId === entry.restaurantId);
+      if (position >= 0) existing[position] = entry;
+      else existing.push(entry);
+      state.document = { schemaVersion: 1, generatedAt: now.toISOString(), restaurants: [...existing] };
       await save();
     } catch (error) {
       if (old) results.push(old);
@@ -67,7 +74,7 @@ try {
     }
   }
   // Do not deploy a partial first run or overwrite a healthy feed with missing restaurants.
-  if (results.length !== config.restaurants.length || !results.some((r) => r.weekStart === monday && WEEK_DAYS.some((d) => r.dishesByDay[d].length))) throw new Error("Ingen komplett publicerbar menyfil; tidigare publicering behålls.");
+  if (results.length !== config.restaurants.length || !results.every((r) => r.weekStart === monday && WEEK_DAYS.some((d) => r.dishesByDay[d].length))) throw new Error("Ingen komplett publicerbar menyfil; tidigare publicering behålls.");
   const document = sanitizeDocument({ schemaVersion: 1, generatedAt: now.toISOString(), restaurants: results });
   await mkdir(`${out}/api/v1`, { recursive: true });
   await writeFile(`${out}/api/v1/lunch.json`, JSON.stringify(document));
