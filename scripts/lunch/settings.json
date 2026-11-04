@@ -1,0 +1,14 @@
+{
+  "departure_refresh_interval": "180",
+  "departure_update_weekends": "true",
+  "departure_active_hours_start": "6",
+  "departure_active_hours_end": "22",
+  "camera_active_hours_start": "6",
+  "camera_active_hours_end": "22",
+  "lunch_auto_refresh_time": "00:01",
+  "lunch_fetch_window_start": "7",
+  "lunch_fetch_window_end": "15",
+  "lunch_hide_refresh_when_complete": "true",
+  "lunch_update_weekends": "false",
+  "lunch_week_view_enabled": "true"
+}

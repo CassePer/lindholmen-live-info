@@ -1,0 +1,14 @@
+{
+  "maxRestaurants": 5,
+  "fetchWindowStart": 7,
+  "fetchWindowEnd": 15,
+  "updateWeekends": false,
+  "paused": false,
+  "restaurants": [
+    {"id":"a0fc4497-a303-4c4a-9af3-b252ff34237a","name":"Bistrot","url":"https://bistrot.se/"},
+    {"id":"1261815c-06ec-4d9b-a6df-5879b4da1729","name":"District One","url":"https://www.districtone.se/lunch.html","websiteUrl":"https://www.districtone.se/"},
+    {"id":"8bc0e9be-458d-49d5-a0d8-ad64b1868d70","name":"Kooperativet","url":"https://www.kooperativet.se/"},
+    {"id":"b0a64c2c-419a-4e87-9d2b-5ad44a88ffe6","name":"Pier11","url":"https://ericssonbynordrest.se/restaurang/restaurant-pier-11/"},
+    {"id":"25a68cfe-b819-4b51-b446-0fb885e20bed","name":"Uni3 - World of Food","url":"https://www.compass-group.se/restauranger-och-menyer/ovriga-restauranger/uni3-world-of-food/","rssUrl":"https://www.compass-group.se/menuapi/feed/rss/current-week?costNumber=448305&language=sv"}
+  ]
+}
