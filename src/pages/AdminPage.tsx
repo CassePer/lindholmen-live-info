@@ -10,6 +10,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { DATABASE_FREE } from "@/lib/deployment-mode";
+import { StaticAdmin } from "@/components/StaticAdmin";
 
 const ADMIN_SESSION_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -567,6 +569,7 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
 
 export default function AdminPage() {
   const [authenticated, setAuthenticated] = useState(getAdminSession);
+  if (DATABASE_FREE) return <StaticAdmin />;
 
   const handleLogout = () => {
     clearAdminSession();

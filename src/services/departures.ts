@@ -1,7 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { DeparturesResponse } from "@/api/types";
+import { DATABASE_FREE } from "@/lib/deployment-mode";
+import { fetchStaticApi } from "@/api/static-client";
 
 export async function getDepartures(time?: string): Promise<DeparturesResponse> {
+  if (DATABASE_FREE) return fetchStaticApi(`/api/v1/departures/lindholmspiren${time ? `?${new URLSearchParams({ time })}` : ""}`);
   const params: Record<string, string> = {};
   if (time) params.time = time;
 
@@ -25,6 +28,7 @@ export async function getDepartures(time?: string): Promise<DeparturesResponse> 
 
 export async function getDeparturesAtTime(time: string): Promise<DeparturesResponse> {
   const queryString = new URLSearchParams({ time }).toString();
+  if (DATABASE_FREE) return fetchStaticApi(`/api/v1/departures/lindholmspiren?${queryString}`);
 
   const { data, error } = await supabase.functions.invoke(`departures?${queryString}`, {
     body: null,

@@ -1,11 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAppSettings } from "@/hooks/use-app-settings";
+import { DATABASE_FREE } from "@/lib/deployment-mode";
+import { fetchStaticApi } from "@/api/static-client";
 
 function useIpTvCheck() {
   return useQuery<{ isTv: boolean }>({
     queryKey: ["client-ip-tv"],
     queryFn: async () => {
+      if (DATABASE_FREE) return fetchStaticApi<{ isTv: boolean }>("/api/v1/tv");
       const { data, error } = await supabase.functions.invoke("client-ip", {
         method: "GET",
       });
