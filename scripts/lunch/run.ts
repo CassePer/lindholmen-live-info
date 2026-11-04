@@ -4,7 +4,7 @@ import config from "./config.json";
 import settings from "./settings.json";
 import { stockholmKey, weekMonday, sanitizeDocument, WEEK_DAYS, type StaticRestaurant, type StaticLunchDocument } from "../../src/lib/static-lunch";
 import { sourceText, renderedSource } from "./sources";
-import { extractWeek } from "./extract";
+import { extractWeek, ExtractionStopped } from "./extract";
 import { canScrape, mayRefresh } from "./policy";
 
 const folder = process.env.LUNCH_STATE_DIR ?? ".lunch-state";
@@ -65,7 +65,7 @@ try {
       await save();
     } catch (error) {
       if (old) results.push(old);
-      if (error instanceof GatewayError || (error instanceof Error && /^RenderService:(402|403|429)/.test(error.message))) {
+      if (error instanceof GatewayError || error instanceof ExtractionStopped || (error instanceof Error && /^RenderService:(402|403|429)/.test(error.message))) {
         state.paused = error instanceof GatewayError ? `AI:${error.httpStatus ?? error.code}` : "RenderService:denied";
         await save();
         throw new Error("Extern tjänst stoppade jobbet. Kontrollera GitHub Actions och återuppta manuellt.");

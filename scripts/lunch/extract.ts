@@ -2,6 +2,8 @@ import type {} from "../generated/ai-gateway/models";
 import { generateResponse } from "@lovable.dev/ai-gateway";
 import { buildWeekPrompt } from "./prompts";
 
+export class ExtractionStopped extends Error {}
+
 /** This is a new standalone extractor; existing Cloud model calls are unchanged. */
 export async function extractWeek(name: string, text: string, date: string, image?: string): Promise<unknown> {
   const response = await generateResponse({
@@ -12,12 +14,12 @@ export async function extractWeek(name: string, text: string, date: string, imag
     ] }],
     text: { format: { type: "json_object" } },
   }, { maxRetries: 0 });
-  if (response.status !== "completed") throw new Error("Extraktionen slutfördes inte.");
+  if (response.status !== "completed") throw new ExtractionStopped("Extraktionen slutfördes inte.");
   let output = "";
   for (const item of response.output) {
     if (item.type !== "message") continue;
     for (const content of item.content) {
-      if (content.type === "refusal") throw new Error("Menyextraktionen avböjdes.");
+      if (content.type === "refusal") throw new ExtractionStopped("Menyextraktionen avböjdes.");
       if (content.type === "output_text") output += content.text;
     }
   }
