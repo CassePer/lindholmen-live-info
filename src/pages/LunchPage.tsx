@@ -13,6 +13,7 @@ import { getLunchMenus } from "@/services/lunch";
 import { useQueryClient } from "@tanstack/react-query";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { LunchMenu, DietTag } from "@/api/types";
+import { DATABASE_FREE } from "@/lib/deployment-mode";
 
 const DAY_LABELS: Record<string, string> = {
   mon: "Mån",
@@ -241,7 +242,7 @@ function RestaurantCard({
             )}
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
-            <Tooltip>
+            {!DATABASE_FREE && <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   onClick={() => !refreshDisabled && onRefresh(menu.restaurantId)}
@@ -269,7 +270,7 @@ function RestaurantCard({
                       </span>
                     )}
               </TooltipContent>
-            </Tooltip>
+            </Tooltip>}
             <a
               href={menu.websiteUrl}
               target="_blank"
@@ -487,7 +488,7 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
   // Completeness is evaluated for the currently selected day, not only today.
   const hasDayMenu = (m: LunchMenu) => (isToday ? !m.stale && m.dishes.length > 0 : m.dishes.length > 0);
   const allDayMenusPresent = menus.length > 0 && menus.every(hasDayMenu);
-  const hideGlobalRefresh = !isToday || (hideWhenComplete && allDayMenusPresent);
+  const hideGlobalRefresh = DATABASE_FREE || !isToday || (hideWhenComplete && allDayMenusPresent);
 
   const content = (
     <div className={embedded ? "space-y-4" : "container max-w-lg mx-auto px-4 py-6 space-y-4"}>

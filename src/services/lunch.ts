@@ -1,5 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { LunchMenu, LunchWeek } from "@/api/types";
+import { DATABASE_FREE } from "@/lib/deployment-mode";
+import { projectStaticLunch } from "@/lib/static-lunch";
+import { fetchStaticApi } from "@/api/static-client";
 
 export interface LunchMenusResult {
   menus: LunchMenu[];
@@ -15,6 +18,9 @@ export interface LunchMenusResult {
  * The edge function handles caching internally.
  */
 export async function getLunchMenus(force = false, restaurantId?: string): Promise<LunchMenusResult> {
+  if (DATABASE_FREE) {
+    return projectStaticLunch(await fetchStaticApi("/api/v1/lunch"));
+  }
   const body: Record<string, unknown> = {};
   if (force) body.force = true;
   if (restaurantId) body.restaurantId = restaurantId;

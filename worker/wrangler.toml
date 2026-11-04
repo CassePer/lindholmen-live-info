@@ -1,0 +1,9 @@
+name = "lindholmen-live-api"
+main = "index.ts"
+compatibility_date = "2026-11-04"
+
+[vars]
+ALLOWED_ORIGINS = "https://lindholmen-live-info.lovable.app"
+
+# TRAFIKLAB_API_KEY, TRAFIKVERKET_API_KEY and optional TV_IP_RANGES
+# are server secrets, configured with wrangler secret put, never in this file.
