@@ -5,6 +5,14 @@ const corsHeaders = {
 
 const TRAFIKVERKET_API = 'https://api.trafikinfo.trafikverket.se/v2/data.json';
 
+export function safeCameraUrl(value: string | undefined): boolean {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && !url.username && !url.password && (url.hostname === 'trafikverket.se' || url.hostname.endsWith('.trafikverket.se'));
+  } catch { return false; }
+}
+
 interface TrafikverketCamera {
   Id: string;
   Name: string;
@@ -72,10 +80,10 @@ export async function camerasHandler(req: Request, env: Record<string, string | 
       method: 'POST',
       headers: { 'Content-Type': 'text/xml' },
       body: xmlBody,
+      signal: AbortSignal.timeout(15000),
     });
 
     if (!response.ok) {
-      const errText = await response.text();
       console.error('Trafikverket API error:', response.status);
       return new Response(
         JSON.stringify({ error: { code: `TRAFIKVERKET_${response.status}`, message: 'Kunde inte hämta kamerabilder.' } }),
@@ -90,7 +98,7 @@ export async function camerasHandler(req: Request, env: Record<string, string | 
     console.log(`Got ${cameraData.length} cameras from Trafikverket`);
 
     const cameras = cameraData
-      .filter((c) => c.PhotoUrl && c.Status !== 'Removed')
+      .filter((c) => safeCameraUrl(c.PhotoUrl) && c.Status !== 'Removed')
       .map((c) => ({
         id: c.Id,
         name: c.Name || 'Okänd kamera',
@@ -110,7 +118,7 @@ export async function camerasHandler(req: Request, env: Record<string, string | 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    console.error('Error fetching cameras:', error);
+    console.error('Error fetching cameras');
     const message = 'Kunde inte hämta informationen.';
     return new Response(
       JSON.stringify({ error: { code: 'INTERNAL_ERROR', message } }),

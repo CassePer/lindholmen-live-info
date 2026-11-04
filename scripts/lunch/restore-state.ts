@@ -8,7 +8,16 @@ const headers = { Authorization: `Bearer ${token}`, Accept: "application/vnd.git
 const response = await fetch(`https://api.github.com/repos/${repo}/actions/artifacts?name=lunch-state&per_page=100`, { headers });
 if (!response.ok) throw new Error("Tidigare jobbstatus kunde inte läsas.");
 const data = await response.json();
-const artifact = data.artifacts.find((a: { expired: boolean; workflow_run?: { head_branch?: string } }) => !a.expired && a.workflow_run?.head_branch === process.env.GITHUB_REF_NAME);
+interface Artifact { id: number; expired: boolean; created_at: string; workflow_run?: { id: number; head_branch?: string } }
+const candidates: Artifact[] = data.artifacts.filter((a: Artifact) => !a.expired && a.workflow_run?.head_branch === process.env.GITHUB_REF_NAME);
+candidates.sort((a, b) => b.created_at.localeCompare(a.created_at));
+let artifact: Artifact | undefined;
+for (const candidate of candidates) {
+  const runResponse = await fetch(`https://api.github.com/repos/${repo}/actions/runs/${candidate.workflow_run?.id}`, { headers });
+  if (!runResponse.ok) throw new Error("Jobbstatusens ursprung kunde inte kontrolleras.");
+  const run = await runResponse.json();
+  if (run.path === ".github/workflows/publish-lunch.yml") { artifact = candidate; break; }
+}
 if (artifact) {
   const file = await fetch(`https://api.github.com/repos/${repo}/actions/artifacts/${artifact.id}/zip`, { headers });
   if (!file.ok) throw new Error("Tidigare jobbstatus kunde inte återställas.");
