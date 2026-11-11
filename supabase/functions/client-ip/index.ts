@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
   const isTv = configuredRange ? isIpInRange(clientIp, configuredRange) : false;
 
   return new Response(
-    JSON.stringify({ ip: clientIp, isTv, configuredRange }),
+    JSON.stringify({ isTv }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   );
 });

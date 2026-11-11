@@ -1,3 +1,5 @@
+import { issueAdminSession } from '../_shared/admin-session.ts';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
@@ -73,9 +75,11 @@ Deno.serve(async (req) => {
 
   try {
     const { password } = await req.json();
+    if (typeof password !== 'string' || password.length > 512) throw new Error('Ogiltigt lösenord.');
     const adminPassword = Deno.env.get('ADMIN_PASSWORD');
+    const sessionSecret = Deno.env.get('ADMIN_SESSION_SECRET');
 
-    if (!adminPassword) {
+    if (!adminPassword || !sessionSecret) {
       return new Response(JSON.stringify({ error: { code: 'CONFIG_ERROR', message: 'Admin password not configured' } }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -83,11 +87,11 @@ Deno.serve(async (req) => {
     }
 
     const valid = password === adminPassword;
-    return new Response(JSON.stringify({ valid }), {
+    return new Response(JSON.stringify({ valid, ...(valid ? { token: await issueAdminSession(sessionSecret) } : {}) }), {
       // Always 200: the client reads `valid`. A non-2xx status makes
       // supabase.functions.invoke throw and surface a runtime error.
       status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
     });
   } catch {
     return new Response(JSON.stringify({ error: { code: 'BAD_REQUEST', message: 'Invalid request' } }), {

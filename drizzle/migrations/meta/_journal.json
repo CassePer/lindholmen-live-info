@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1794389647077,
+      "tag": "0000_protect_settings_from_direct_client_access",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794390046324,
+      "tag": "0001_remove_obsolete_public_settings_policy",
+      "breakpoints": true
+    }
+  ]
+}

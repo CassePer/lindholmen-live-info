@@ -1,9 +1,11 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { isAdminRequest } from '../_shared/admin-session.ts';
+import { allowedSource } from '../_shared/source-policy.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+    'authorization, x-admin-session, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 Deno.serve(async (req) => {
@@ -11,8 +13,10 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  if (!(await isAdminRequest(req))) return new Response(JSON.stringify({ error: { code: 'UNAUTHORIZED', message: 'Logga in som administratör.' } }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!supabaseUrl || !serviceKey) return new Response('Konfiguration saknas.', { status: 500, headers: corsHeaders });
   const supabase = createClient(supabaseUrl, serviceKey);
 
   try {
@@ -55,7 +59,7 @@ Deno.serve(async (req) => {
 
       // Default POST: create restaurant
       const { name, website_url, menu_url } = body;
-      if (!name || !menu_url) {
+      if (typeof name !== 'string' || !name.trim() || name.length > 150 || !allowedSource(menu_url) || (website_url && !allowedSource(website_url))) {
         return new Response(JSON.stringify({ error: 'name and menu_url required' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -75,7 +79,9 @@ Deno.serve(async (req) => {
     if (req.method === 'PUT' || req.method === 'PATCH') {
       const body = await req.json();
       const { id, ...updates } = body;
-      if (!id) {
+      const permitted = ['name', 'website_url', 'menu_url', 'rss_url', 'active', 'weekly_menu'];
+      const invalid = Object.entries(updates).some(([key, value]) => !permitted.includes(key) || (['website_url', 'menu_url', 'rss_url'].includes(key) && !allowedSource(value)) || (['active', 'weekly_menu'].includes(key) && typeof value !== 'boolean') || (key === 'name' && (typeof value !== 'string' || !value.trim() || value.length > 150)));
+      if (typeof id !== 'string' || !/^[a-f0-9-]{36}$/i.test(id) || invalid) {
         return new Response(JSON.stringify({ error: 'id required' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

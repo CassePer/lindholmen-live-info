@@ -12,24 +12,16 @@ import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { DATABASE_FREE } from "@/lib/deployment-mode";
 import { StaticAdmin } from "@/components/StaticAdmin";
+import { adminHeaders, getAdminToken, saveAdminToken, removeAdminToken } from "@/lib/admin-session";
 
 const ADMIN_SESSION_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 function getAdminSession(): boolean {
-  const raw = sessionStorage.getItem("admin_authenticated_at");
-  if (!raw) return false;
-  if (Date.now() - Number(raw) > ADMIN_SESSION_TTL_MS) {
-    sessionStorage.removeItem("admin_authenticated_at");
-    return false;
-  }
-  return true;
-}
-
-function setAdminSession() {
-  sessionStorage.setItem("admin_authenticated_at", String(Date.now()));
+  return !!getAdminToken();
 }
 
 function clearAdminSession() {
+  removeAdminToken();
   sessionStorage.removeItem("admin_authenticated_at");
 }
 
@@ -49,10 +41,10 @@ function AdminPasswordGate({ onAuthenticated }: { onAuthenticated: () => void })
         method: "POST",
         body: { password },
       });
-      if (fnError || !data?.valid) {
+      if (fnError || !data?.valid || typeof data.token !== "string") {
         setError(true);
       } else {
-        setAdminSession();
+        saveAdminToken(data.token);
         onAuthenticated();
       }
     } catch {
@@ -116,7 +108,7 @@ function useRestaurants() {
   return useQuery<Restaurant[]>({
     queryKey: ["admin-restaurants"],
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke("admin-restaurants", { method: "GET" });
+      const { data, error } = await supabase.functions.invoke("admin-restaurants", { method: "GET", headers: adminHeaders() });
       if (error) throw error;
       return data;
     },
@@ -127,7 +119,7 @@ function useSettings() {
   return useQuery<Record<string, string>>({
     queryKey: ["admin-settings"],
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke("admin-settings", { method: "GET" });
+      const { data, error } = await supabase.functions.invoke("admin-settings", { method: "GET", headers: adminHeaders() });
       if (error) throw error;
       return data;
     },
@@ -259,7 +251,7 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
   const addMutation = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke("admin-restaurants", {
-        method: "POST", body: { name, website_url: websiteUrl, menu_url: menuUrl },
+        method: "POST", headers: adminHeaders(), body: { name, website_url: websiteUrl, menu_url: menuUrl },
       });
       if (error) throw error;
       return data;
@@ -270,7 +262,7 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<Restaurant> }) => {
-      const { data, error } = await supabase.functions.invoke("admin-restaurants", { method: "PUT", body: { id, ...updates } });
+      const { data, error } = await supabase.functions.invoke("admin-restaurants", { method: "PUT", headers: adminHeaders(), body: { id, ...updates } });
       if (error) throw error;
       return data;
     },
@@ -280,7 +272,7 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { data, error } = await supabase.functions.invoke("admin-restaurants", { method: "POST", body: { action: "delete", id } });
+      const { data, error } = await supabase.functions.invoke("admin-restaurants", { method: "POST", headers: adminHeaders(), body: { action: "delete", id } });
       if (error) throw error;
       return data;
     },
@@ -290,7 +282,7 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
 
   const clearCacheMutation = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke("admin-restaurants", { method: "POST", body: { action: "clear_cache" } });
+      const { data, error } = await supabase.functions.invoke("admin-restaurants", { method: "POST", headers: adminHeaders(), body: { action: "clear_cache" } });
       if (error) throw error;
       return data;
     },
@@ -300,7 +292,7 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
 
   const saveSettingMutation = useMutation({
     mutationFn: async ({ key, value }: { key: string; value: string }) => {
-      const { data, error } = await supabase.functions.invoke("admin-settings", { method: "POST", body: { key, value } });
+      const { data, error } = await supabase.functions.invoke("admin-settings", { method: "POST", headers: adminHeaders(), body: { key, value } });
       if (error) throw error;
       return data;
     },

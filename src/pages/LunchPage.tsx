@@ -14,6 +14,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { LunchMenu, DietTag } from "@/api/types";
 import { DATABASE_FREE } from "@/lib/deployment-mode";
+import { menusForDate } from "@/lib/lunch-view";
 
 const DAY_LABELS: Record<string, string> = {
   mon: "Mån",
@@ -472,9 +473,7 @@ export default function LunchPage({ embedded }: { embedded?: boolean }) {
   const isToday = effectiveDate === todayKey;
 
   const todaysMenus = data?.menus ?? [];
-  const menus = !week || isToday
-    ? todaysMenus
-    : weekDays.find((d) => d.date === effectiveDate)?.menus ?? [];
+  const menus = week ? menusForDate(todaysMenus, week, effectiveDate, todayKey) : todaysMenus;
   const aiCreditsExhausted = data?.aiCreditsExhausted ?? false;
   const filtered = menus.filter((m) =>
     m.restaurantName.toLowerCase().includes(activeSearch.toLowerCase()) ||

@@ -1,5 +1,11 @@
 # Säker drift utan databas
 
+## Menyfel, API:er och säkerhet
+- [x] Felsök och rätta tom dagens meny trots tillgänglig veckomeny; lägg till regressionstest.
+- [x] Uppdatera Firecrawl och kontrollera övriga externa API-versioner.
+- [x] Granska säkerheten, uppdatera kompatibla paket och verifiera med tester och faktisk menyvisning.
+
+
 - [x] Förankra säker flytt: statiska lunchmenyer och offentlig konfiguration, separat serverdrift för hemligheter och liveanrop.
 - [x] Skapa fristående menyhämtning, schemalagd GitHub Action och validerad JSON-publicering (aktivering avvaktar extern konfiguration).
 - [x] Förbered valbart läge för statiska läsningar och versionshanterade API-anrop; befintlig drift behålls.
