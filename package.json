@@ -95,12 +95,15 @@
     "vitest": "^3.2.4"
   },
   "overrides": {
-    "picomatch": "^4.0.3",
+    "picomatch": "^4.0.4",
     "rollup": "^4.52.5",
-    "glob": "^11.0.3",
-    "fast-uri": "^3.1.0",
-    "minimatch": "^10.0.3",
+    "glob": "^14.0.4",
+    "fast-uri": "^3.1.9",
+    "minimatch": "^11.0.7",
     "ajv": "^8.17.1",
-    "brace-expansion": "^2.0.2"
+    "brace-expansion": "^2.1.7",
+    "ws": "^8.22.2",
+    "browserslist": "^4.29.5",
+    "baseline-browser-mapping": "^2.11.35"
   }
 }

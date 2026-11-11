@@ -73,8 +73,8 @@ interface WeeklyMenuRaw {
 /** Convert a weekly cached menu into the normal single-day menu shape used by the UI. */
 function weeklyToDayMenu(raw: WeeklyMenuRaw, dk: DayKey, dateKey: string) {
   const byDay = raw?.dishesByDay ?? {};
-  const todays = Array.isArray(byDay[dk]) ? byDay[dk]! : [];
-  const weekList = Array.isArray(byDay.week) ? byDay.week! : [];
+  const todays = byDay[dk] ?? [];
+  const weekList = byDay.week ?? [];
   const weekPrefixed = weekList.map((d) => ({
     ...d,
     name: d?.name?.startsWith('(') ? d.name : `(Hela veckan) ${d.name}`,
@@ -134,7 +134,7 @@ interface ScrapeResult {
 
 async function scrapeUrl(url: string, firecrawlKey: string): Promise<ScrapeResult> {
   try {
-    const res = await fetch('https://api.firecrawl.dev/v1/scrape', {
+    const res = await fetch('https://api.firecrawl.dev/v2/scrape', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${firecrawlKey}`,
@@ -142,7 +142,7 @@ async function scrapeUrl(url: string, firecrawlKey: string): Promise<ScrapeResul
       },
       body: JSON.stringify({
         url,
-        formats: ['markdown', 'screenshot@fullPage'],
+        formats: ['markdown', { type: 'screenshot', fullPage: true }],
         onlyMainContent: false,
         waitFor: 5000,
         timeout: 30000,
@@ -929,10 +929,6 @@ Deno.serve(async (req) => {
       if (row.menu_data?.weekly) return row.menu_data?.weekStart === mondayKey;
       return row.week_key === todayKey;
     });
-    // Whether we have any daily cache for today — drives "serve from cache" decision
-    const hasTodayDaily = (cacheRowsAll ?? []).some(
-      (row: any) => row.week_key === todayKey && !row.menu_data?.weekly
-    );
 
     // Backfill: restaurants flagged as weekly_menu that have NO weekly cache row
     // for this Monday. Without this, a present daily cache short-circuits the
@@ -955,7 +951,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (!cacheError && hasTodayDaily && cached.length > 0) {
+    // Weekly cache is sufficient on its own, including after the fetch window closes.
+    if (!cacheError && cached.length > 0) {
       // Single restaurant refresh — bypass cooldown, re-scrape only one
       if (singleRestaurantId) {
         // Window check: only allow scraping on weekdays 08–14
@@ -1009,9 +1006,8 @@ Deno.serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
-        // Cooldown passed – clear cache and re-scrape
+        // Keep healthy cache until a validated replacement is ready.
         console.log(`Force refresh allowed – cache is ${Math.floor(ageMs / 60000)}min old`);
-        await supabase.from('lunch_menu_cache').delete().in('week_key', cacheKeys);
       } else if (weeklyBackfillIds.length === 0) {
         // Normal request – serve from cache
         console.log(`Serving ${cached.length} menus from cache for ${todayKey}`);
@@ -1030,7 +1026,7 @@ Deno.serve(async (req) => {
       if (!window.allowed) {
         console.log(`Refresh blocked – outside fetch window: ${window.reason}`);
         return new Response(
-          JSON.stringify({ cooldown: true, minutesLeft: 0, reason: window.reason, menus: [], week }),
+          JSON.stringify({ cooldown: true, minutesLeft: 0, reason: window.reason, menus: sortByName((await fillMissingFromYesterday([])).map((m: any) => ({ ...m, stale: m.date !== todayKey }))), week }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -1041,7 +1037,7 @@ Deno.serve(async (req) => {
       if (!window.allowed) {
         console.log(`Initial scrape blocked – outside fetch window: ${window.reason}`);
         return new Response(
-          JSON.stringify({ menus: [], reason: window.reason, week }),
+          JSON.stringify({ menus: sortByName((await fillMissingFromYesterday([])).map((m: any) => ({ ...m, stale: m.date !== todayKey }))), reason: window.reason, week }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
