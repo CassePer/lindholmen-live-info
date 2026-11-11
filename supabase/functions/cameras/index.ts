@@ -70,6 +70,7 @@ Deno.serve(async (req) => {
 
     const response = await fetch(TRAFIKVERKET_API, {
       method: 'POST',
+      redirect: 'error', signal: AbortSignal.timeout(15000),
       headers: { 'Content-Type': 'text/xml' },
       body: xmlBody,
     });
@@ -90,14 +91,19 @@ Deno.serve(async (req) => {
     console.log(`Got ${cameraData.length} cameras from Trafikverket`);
 
     const cameras = cameraData
-      .filter((c) => c.PhotoUrl && c.Status !== 'Removed')
+      .filter((c) => {
+        try {
+          const url = new URL(c.PhotoUrl ?? '');
+          return c.Status !== 'Removed' && url.protocol === 'https:' && !url.username && !url.password && (url.hostname === 'trafikverket.se' || url.hostname.endsWith('.trafikverket.se'));
+        } catch { return false; }
+      })
       .map((c) => ({
         id: c.Id,
         name: c.Name || 'Okänd kamera',
         location: c.Location || 'Göteborg',
         description: c.Description || undefined,
-        thumbnailUrl: c.PhotoUrl!,
-        fullImageUrl: c.PhotoUrl!,
+        thumbnailUrl: c.PhotoUrl ?? '',
+        fullImageUrl: c.PhotoUrl ?? '',
         updatedAt: c.PhotoTime || c.ModifiedTime || new Date().toISOString(),
         direction: c.Direction,
         type: c.Type,

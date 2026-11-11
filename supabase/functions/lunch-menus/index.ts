@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { allowedSource } from '../_shared/source-policy.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -133,9 +134,12 @@ interface ScrapeResult {
 }
 
 async function scrapeUrl(url: string, firecrawlKey: string): Promise<ScrapeResult> {
+  if (!allowedSource(url)) return { markdown: null, screenshot: null };
   try {
     const res = await fetch('https://api.firecrawl.dev/v2/scrape', {
       method: 'POST',
+      redirect: 'error',
+      signal: AbortSignal.timeout(40000),
       headers: {
         Authorization: `Bearer ${firecrawlKey}`,
         'Content-Type': 'application/json',
@@ -164,8 +168,10 @@ async function scrapeUrl(url: string, firecrawlKey: string): Promise<ScrapeResul
 
 /** Direct HTML fetch → plain text. Works for server-rendered menu pages. */
 async function fetchPageText(url: string): Promise<string | null> {
+  if (!allowedSource(url)) return null;
   try {
     const res = await fetch(url, {
+      redirect: 'error', signal: AbortSignal.timeout(20000),
       headers: {
         'User-Agent':
           'Mozilla/5.0 (compatible; LindholmenLunchBot/1.0; +https://lindholmen-live-info.lovable.app)',
@@ -578,8 +584,9 @@ async function extractWeeklyMenuFromScreenshot(
 }
 
 async function fetchRssMenu(rssUrl: string, todayStr: string): Promise<string | null> {
+  if (!allowedSource(rssUrl)) return null;
   try {
-    const res = await fetch(rssUrl);
+    const res = await fetch(rssUrl, { redirect: 'error', signal: AbortSignal.timeout(20000) });
     if (!res.ok) {
       console.error(`RSS fetch failed: ${res.status}`);
       return null;
@@ -621,8 +628,9 @@ async function fetchRssMenu(rssUrl: string, todayStr: string): Promise<string | 
  * text blob with explicit day headings — ideal input for weekly extraction.
  */
 async function fetchRssWeeklyText(rssUrl: string): Promise<string | null> {
+  if (!allowedSource(rssUrl)) return null;
   try {
-    const res = await fetch(rssUrl);
+    const res = await fetch(rssUrl, { redirect: 'error', signal: AbortSignal.timeout(20000) });
     if (!res.ok) {
       console.error(`Weekly RSS fetch failed: ${res.status}`);
       return null;
@@ -668,8 +676,9 @@ function decodeRssHtml(desc: string): string {
 
 /** Fetch daily RSS feed (single item, no date matching needed) */
 async function fetchRssDailyMenu(rssUrl: string): Promise<string | null> {
+  if (!allowedSource(rssUrl)) return null;
   try {
-    const res = await fetch(rssUrl);
+    const res = await fetch(rssUrl, { redirect: 'error', signal: AbortSignal.timeout(20000) });
     if (!res.ok) {
       console.error(`RSS daily fetch failed: ${res.status}`);
       return null;
@@ -701,8 +710,9 @@ async function fetchRssDailyMenu(rssUrl: string): Promise<string | null> {
 
 /** Fetch Compass Group JSON feed */
 async function fetchJsonMenu(jsonUrl: string): Promise<string | null> {
+  if (!allowedSource(jsonUrl)) return null;
   try {
-    const res = await fetch(jsonUrl);
+    const res = await fetch(jsonUrl, { redirect: 'error', signal: AbortSignal.timeout(20000) });
     if (!res.ok) {
       console.error(`JSON feed fetch failed: ${res.status}`);
       return null;

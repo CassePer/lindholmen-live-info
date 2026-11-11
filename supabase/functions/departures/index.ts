@@ -72,12 +72,11 @@ function formatTime(isoStr: string): string {
 }
 
 async function fetchDepartures(areaId: string, apiKey: string, time?: string | null): Promise<TrafiklabResponse | null> {
-  let url = `${TRAFIKLAB_BASE}/departures/${areaId}`;
-  if (time) url += `/${time}`;
-  url += `?key=${apiKey}`;
+  const url = new URL(`${TRAFIKLAB_BASE}/departures/${areaId}${time ? `/${encodeURIComponent(time)}` : ''}`);
+  url.searchParams.set('key', apiKey);
 
-  console.log('Fetching departures from:', url.replace(apiKey, '***'));
-  const res = await fetch(url);
+  console.log('Fetching departures for:', areaId);
+  const res = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(15000) });
   if (!res.ok) {
     console.error(`Departures error for ${areaId}:`, res.status);
     return null;
@@ -142,6 +141,7 @@ Deno.serve(async (req) => {
 
     const url = new URL(req.url);
     const time = url.searchParams.get('time');
+    if (time && (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(time) || !Number.isFinite(Date.parse(`${time}:00Z`)))) return new Response(JSON.stringify({ error: { code: 'BAD_REQUEST', message: 'Ogiltig avgångstid.' } }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
     // Use default stop IDs directly (no per-request settings lookup)
     const stopIds = { bus: DEFAULT_STOP_BUS, tram: DEFAULT_STOP_TRAM, ferry: DEFAULT_STOP_FERRY };

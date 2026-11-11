@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { isAdminRequest } from '../_shared/admin-session.ts';
+import { allowedSource } from '../_shared/source-policy.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -58,7 +59,7 @@ Deno.serve(async (req) => {
 
       // Default POST: create restaurant
       const { name, website_url, menu_url } = body;
-      if (!name || !menu_url) {
+      if (typeof name !== 'string' || !name.trim() || name.length > 150 || !allowedSource(menu_url) || (website_url && !allowedSource(website_url))) {
         return new Response(JSON.stringify({ error: 'name and menu_url required' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -78,7 +79,9 @@ Deno.serve(async (req) => {
     if (req.method === 'PUT' || req.method === 'PATCH') {
       const body = await req.json();
       const { id, ...updates } = body;
-      if (!id) {
+      const permitted = ['name', 'website_url', 'menu_url', 'rss_url', 'active', 'weekly_menu'];
+      const invalid = Object.entries(updates).some(([key, value]) => !permitted.includes(key) || (['website_url', 'menu_url', 'rss_url'].includes(key) && !allowedSource(value)) || (['active', 'weekly_menu'].includes(key) && typeof value !== 'boolean') || (key === 'name' && (typeof value !== 'string' || !value.trim() || value.length > 150)));
+      if (typeof id !== 'string' || !/^[a-f0-9-]{36}$/i.test(id) || invalid) {
         return new Response(JSON.stringify({ error: 'id required' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

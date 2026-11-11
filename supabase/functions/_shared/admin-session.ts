@@ -18,5 +18,6 @@ export async function verifyAdminSession(token: string | null, secret: string | 
   return crypto.subtle.verify("HMAC", await signingKey(secret), signature, new TextEncoder().encode(`${parts[0]}.${parts[1]}`));
 }
 export function isAdminRequest(req: Request): Promise<boolean> {
-  return verifyAdminSession(req.headers.get("x-admin-session"), Deno.env.get("ADMIN_SESSION_SECRET"));
+  const runtime = globalThis as typeof globalThis & { Deno?: { env: { get(name: string): string | undefined } } };
+  return verifyAdminSession(req.headers.get("x-admin-session"), runtime.Deno?.env.get("ADMIN_SESSION_SECRET"));
 }
