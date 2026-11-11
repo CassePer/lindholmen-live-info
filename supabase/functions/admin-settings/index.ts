@@ -1,9 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { isAdminRequest } from '../_shared/admin-session.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+    'authorization, x-admin-session, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 Deno.serve(async (req) => {
@@ -11,8 +12,11 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const admin = await isAdminRequest(req);
+  if (req.method !== 'GET' && !admin) return new Response(JSON.stringify({ error: { code: 'UNAUTHORIZED', message: 'Logga in som administratör.' } }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!supabaseUrl || !serviceKey) return new Response('Konfiguration saknas.', { status: 500, headers: corsHeaders });
   const supabase = createClient(supabaseUrl, serviceKey);
 
   try {
@@ -23,6 +27,7 @@ Deno.serve(async (req) => {
       if (error) throw error;
       const settings: Record<string, string> = {};
       for (const row of data) {
+        if (!admin && row.key === 'tv_ip_range') continue;
         settings[row.key] = row.value;
       }
       return new Response(JSON.stringify(settings), {
@@ -33,7 +38,7 @@ Deno.serve(async (req) => {
     if (req.method === 'PUT' || req.method === 'POST') {
       const body = await req.json();
       const { key, value } = body;
-      if (!key || value === undefined) {
+      if (typeof key !== 'string' || !/^(lunch_|departure_|camera_|tv_)[a-z_]+$/.test(key) || typeof value !== 'string' || value.length > 2000) {
         return new Response(JSON.stringify({ error: 'key and value required' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

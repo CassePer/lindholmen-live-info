@@ -4,7 +4,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 const repo = process.env.GITHUB_REPOSITORY;
 const token = process.env.GITHUB_TOKEN;
 if (!repo || !token) throw new Error("GitHub-jobbet saknar behörighet.");
-const headers = { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" };
+const headers = { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2026-03-10" };
 const response = await fetch(`https://api.github.com/repos/${repo}/actions/artifacts?name=lunch-state&per_page=100`, { headers });
 if (!response.ok) throw new Error("Tidigare jobbstatus kunde inte läsas.");
 const data = await response.json();
