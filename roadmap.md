@@ -1,5 +1,10 @@
 # Säker drift utan databas
 
+## Automatisk Worker-publicering
+- [x] Lägg till GitHub Actions för den separata Worker-tjänsten och dokumentera säker aktivering.
+- [x] Verifiera tester och publiceringsregler: 8 säkerhetstester godkända och actionlint utan fel.
+- [ ] Verifiera verklig Worker-publicering; blockerad av Cloudflare-behörigheter, Worker-hemligheter och aktivering med WORKER_DEPLOY_ENABLED i GitHub.
+
 ## Administration och optimeringsbranch
 - [x] Tillåt Ophelias menyadress i befintlig säkerhetskontroll och verifiera regressionstest och driftsättning.
 - [ ] Kontrollera versionen i chatten ”Optimize Run credit usage”; blockerad av att chatten inte finns i tillgänglig historik och ingen separat GitHub-branch eller Lovable-version är synlig här.
