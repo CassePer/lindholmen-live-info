@@ -33,6 +33,20 @@ bunx wrangler deploy --config worker/wrangler.toml
 
 IP-listan är valfri och stannar som serverhemlighet. Endast `isTv` lämnas till klienten; Cloudflares egen `CF-Connecting-IP` används. IPv4/CIDR stöds som tidigare. Konfigurera tillåtna appursprung i `ALLOWED_ORIGINS` samt Cloudflare rate limiting innan publik drift. CORS skyddar inte mot anrop utanför webbläsaren och är ingen autentisering. Alla skrivande metoder avvisas; inget adminlösenord används i nya driften.
 
+### Automatisk Worker-publicering från GitHub
+
+`.github/workflows/deploy-worker.yml` publicerar **bara den separata live-API-tjänsten** `lindholmen-live-api`, aldrig Lovable-appen. Befintlig Cloud-drift och lunchpublicering ändras inte. Flödet är förberett men avstängt tills det aktiveras nedan.
+
+1. Skapa GitHub Actions-miljön `cloudflare-worker`. Begränsa till standardbranchen `main`; lägg gärna till granskningskrav inför publicering om GitHub-abonnemanget stöder det.
+2. Lägg `CLOUDFLARE_API_TOKEN` och `CLOUDFLARE_ACCOUNT_ID` i miljöns **Secrets**. Använd en token med Workers Scripts Edit för endast det avsedda kontot; inga DNS-, zon- eller administratörsrättigheter behövs. Lägg aldrig nycklar i kod, chatten eller `VITE_*`.
+3. Konfigurera `TRAFIKLAB_API_KEY`, `TRAFIKVERKET_API_KEY` och eventuell `TV_IP_RANGES` som Worker-hemligheter hos Cloudflare enligt kommandona ovan innan tjänsten tas i bruk. De hämtas inte från Lovable Cloud och skrivs inte över av Actions. Granska även tillåtna ursprung och trafikbegränsningar.
+4. Kontrollera Cloudflare-kontots plan och användningsgränser innan aktivering. Använd gratisplanen om den räcker; flödet väljer eller uppgraderar inte abonnemang. Worker-trafik kan medföra kostnader på en betald plan, och GitHub Actions omfattas av kontots minutkvot.
+5. Sätt repositoryvariabeln `WORKER_DEPLOY_ENABLED=true` och kör **Publicera Cloudflare Worker → Run workflow** från `main` för första verifieringen.
+
+Därefter publiceras ändringar i `worker/`, detta publiceringsflöde och relevanta test-/paketfiler automatiskt vid push till `main`. Andra brancher och ändringsförslag publicerar inte. Vid byte av standardbranch ska workflowets `branches` uppdateras samtidigt. Ett separat concurrency-lås hindrar parallella publiceringar och säkerhetstester måste lyckas före publicering. Wrangler-versionen är låst i flödet för reproducerbar verktygsanvändning.
+
+Sätt `WORKER_DEPLOY_ENABLED=false` för att stoppa kommande publiceringar; det stoppar inte en redan pågående körning och stänger inte av den publicerade tjänsten. Återställ en tidigare granskad Worker-version i `main` och kör flödet igen för återgång. Verklig publicering och läsning genom tjänsten är inte verifierade förrän externa behörigheter och runtime-hemligheter finns.
+
 ## 4. Byte och verifiering
 
 Efter lyckat verkligt Pages-jobb och verifierad Worker, sätt följande **offentliga** bygginställningar vid den engångspublicering som aktiverar appens nya läge:
