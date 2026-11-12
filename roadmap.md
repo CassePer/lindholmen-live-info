@@ -1,5 +1,9 @@
 # Säker drift utan databas
 
+## Administration och optimeringsbranch
+- [x] Tillåt Ophelias menyadress i befintlig säkerhetskontroll och verifiera regressionstest och driftsättning.
+- [ ] Kontrollera versionen i chatten ”Optimize Run credit usage”; blockerad av att chatten inte finns i tillgänglig historik och ingen separat GitHub-branch eller Lovable-version är synlig här.
+
 ## Menyfel, API:er och säkerhet
 - [x] Felsök och rätta tom dagens meny trots tillgänglig veckomeny; lägg till regressionstest.
 - [x] Uppdatera Firecrawl och kontrollera övriga externa API-versioner.
