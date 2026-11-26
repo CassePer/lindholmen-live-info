@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
 
       if (body.action === 'delete') {
         if (!body.id) {
-          return new Response(JSON.stringify({ error: 'id required' }), {
+          return new Response(JSON.stringify({ error: 'Ogiltiga uppgifter – kontrollera att adresserna är tillåtna https-adresser.' }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
@@ -79,8 +79,13 @@ Deno.serve(async (req) => {
     if (req.method === 'PUT' || req.method === 'PATCH') {
       const body = await req.json();
       const { id, ...updates } = body;
+      // Empty optional links mean "not set": website falls back to the menu page, RSS is cleared.
+      if (updates.website_url === '' || updates.website_url === null) {
+        if (typeof updates.menu_url === 'string') updates.website_url = updates.menu_url; else delete updates.website_url;
+      }
+      if (updates.rss_url === '') updates.rss_url = null;
       const permitted = ['name', 'website_url', 'menu_url', 'rss_url', 'active', 'weekly_menu'];
-      const invalid = Object.entries(updates).some(([key, value]) => !permitted.includes(key) || (['website_url', 'menu_url', 'rss_url'].includes(key) && !allowedSource(value)) || (['active', 'weekly_menu'].includes(key) && typeof value !== 'boolean') || (key === 'name' && (typeof value !== 'string' || !value.trim() || value.length > 150)));
+      const invalid = Object.entries(updates).some(([key, value]) => !permitted.includes(key) || (['website_url', 'menu_url', 'rss_url'].includes(key) && !(key === 'rss_url' && value === null) && !allowedSource(value)) || (['active', 'weekly_menu'].includes(key) && typeof value !== 'boolean') || (key === 'name' && (typeof value !== 'string' || !value.trim() || value.length > 150)));
       if (typeof id !== 'string' || !/^[a-f0-9-]{36}$/i.test(id) || invalid) {
         return new Response(JSON.stringify({ error: 'id required' }), {
           status: 400,
