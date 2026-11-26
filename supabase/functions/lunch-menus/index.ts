@@ -205,6 +205,57 @@ async function fetchPageText(url: string): Promise<string | null> {
   }
 }
 
+
+/** Some sites (District One) render the lunch from a public Google Sheet CSV via their own JS. */
+const SHEET_RE = /https:\/\/docs\.google\.com\/spreadsheets\/d\/([A-Za-z0-9_-]{20,80})\/gviz\/tq\?tqx=out:csv/;
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = []; let row: string[] = []; let f = ''; let q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += c; }
+    else if (c === '"') q = true;
+    else if (c === ',') { row.push(f); f = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(f); rows.push(row); row = []; f = ''; }
+    else f += c;
+  }
+  if (f || row.length) { row.push(f); rows.push(row); }
+  return rows;
+}
+async function fetchSheetMenuText(url: string): Promise<string | null> {
+  if (!allowedSource(url)) return null;
+  try {
+    const page = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(15000) });
+    if (!page.ok) return null;
+    const html = await page.text();
+    let match = html.match(SHEET_RE);
+    if (!match) {
+      const scripts = [...html.matchAll(/<script[^>]+src="([^"]+\.js)"/gi)].map((m) => new URL(m[1], url).toString())
+        .filter((s) => allowedSource(s) && new URL(s).hostname === new URL(url).hostname).slice(0, 5);
+      for (const s of scripts) {
+        const js = await fetch(s, { redirect: 'error', signal: AbortSignal.timeout(15000) });
+        if (!js.ok) continue;
+        match = (await js.text()).slice(0, 500000).match(SHEET_RE);
+        if (match) break;
+      }
+    }
+    if (!match) return null;
+    const res = await fetch(`https://docs.google.com/spreadsheets/d/${match[1]}/gviz/tq?tqx=out:csv`, { redirect: 'follow', signal: AbortSignal.timeout(15000) });
+    if (!res.ok) return null;
+    const csv = (await res.text()).slice(0, 300000);
+    const lines: string[] = [];
+    for (const r of parseCsv(csv).slice(1)) {
+      const [day = '', cat = '', dish = ''] = r.map((c) => c.replace(/\s+/g, ' ').trim());
+      if (/^vecka/i.test(day)) lines.push(day);
+      else if (day && dish) lines.push(`${day}: ${cat ? cat + ' – ' : ''}${dish}`);
+    }
+    const text = lines.join('\n');
+    return text.length > 0 ? text : null;
+  } catch (err) {
+    console.error(`Sheet menu fetch error for ${url}:`, err);
+    return null;
+  }
+}
+
 /**
  * Collect candidate page texts. Direct HTML fetch is tried first (it keeps the
  * full menu markup for server-rendered pages), Firecrawl markdown second
@@ -217,11 +268,13 @@ async function collectPageContent(
   candidates: { text: string; source: 'direct' | 'firecrawl' }[];
   screenshot: string | null;
 }> {
-  const [direct, scraped] = await Promise.all([
+  const [sheet, direct, scraped] = await Promise.all([
+    fetchSheetMenuText(url),
     fetchPageText(url),
     scrapeUrl(url, firecrawlKey),
   ]);
   const candidates: { text: string; source: 'direct' | 'firecrawl' }[] = [];
+  if (sheet && sheet.length >= MIN_MARKDOWN_LENGTH) candidates.push({ text: sheet, source: 'direct' });
   if (direct && direct.length >= MIN_MARKDOWN_LENGTH) {
     candidates.push({ text: direct, source: 'direct' });
   }
