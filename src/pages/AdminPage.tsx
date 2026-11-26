@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { TV_PANELS, parseTvPanels, toggleTvPanel } from "@/lib/tv-panels";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -419,6 +420,28 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
                   {saveSettingMutation.isPending ? "Sparar..." : "Spara"}
                 </Button>
               </div>
+            </div>
+            <div>
+              <p className="text-sm font-medium mb-1">TV-läge – visa i vänstra delen (välj 1 eller 2)</p>
+              <div className="flex flex-wrap gap-4">
+                {TV_PANELS.map((p) => {
+                  const current = parseTvPanels(settings?.tv_panels);
+                  const checked = current.includes(p.id);
+                  const next = toggleTvPanel(current, p.id);
+                  return (
+                    <div key={p.id} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`tv-panel-${p.id}`}
+                        checked={checked}
+                        disabled={!next || saveSettingMutation.isPending}
+                        onCheckedChange={() => next && saveSettingMutation.mutate({ key: "tv_panels", value: next.join(",") })}
+                      />
+                      <Label htmlFor={`tv-panel-${p.id}`}>{p.label}</Label>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Minst 1 och högst 2 kan visas samtidigt.</p>
             </div>
             <div className="border-t pt-3 mt-3">
               <p className="text-sm font-medium mb-2">Helguppdateringar</p>
