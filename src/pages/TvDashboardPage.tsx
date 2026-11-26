@@ -1,3 +1,4 @@
+import { useState } from "react";
 import LunchPage from "@/pages/LunchPage";
 import DeparturesPage from "@/pages/DeparturesPage";
 import CamerasPage from "@/pages/CamerasPage";
@@ -18,7 +19,15 @@ const PANEL_COMPONENTS: Record<TvPanel, () => JSX.Element> = {
 
 export default function TvDashboardPage({ iframeUrl }: TvDashboardPageProps) {
   const { data: settings } = useAppSettings();
-  const panels = parseTvPanels(settings?.tv_panels);
+  const [chosen, setChosen] = useState<string | null>(() => {
+    try { return localStorage.getItem("tv_panels"); } catch { return null; }
+  });
+  const panels = parseTvPanels(chosen ?? settings?.tv_panels);
+  const choose = (next: TvPanel[]) => {
+    const value = next.join(",");
+    setChosen(value);
+    try { localStorage.setItem("tv_panels", value); } catch { /* ignore */ }
+  };
 
   return (
     <main className="flex h-screen overflow-hidden">
@@ -57,7 +66,7 @@ export default function TvDashboardPage({ iframeUrl }: TvDashboardPageProps) {
         )}
       </div>
 
-      <TvToolbar />
+      <TvToolbar panels={panels} onChange={choose} />
     </main>
   );
 }

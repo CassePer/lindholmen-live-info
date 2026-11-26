@@ -422,7 +422,7 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
               </div>
             </div>
             <div>
-              <p className="text-sm font-medium mb-1">TV-läge – visa i vänstra delen (välj 1 eller 2)</p>
+              <p className="text-sm font-medium mb-1">TV-läge – standardval för vänstra delen (välj 1 eller 2)</p>
               <div className="flex flex-wrap gap-4">
                 {TV_PANELS.map((p) => {
                   const current = parseTvPanels(settings?.tv_panels);
@@ -441,7 +441,7 @@ function AdminContent({ onLogout }: { onLogout: () => void }) {
                   );
                 })}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Minst 1 och högst 2 kan visas samtidigt.</p>
+              <p className="text-xs text-muted-foreground mt-1">Minst 1 och högst 2. Tittaren kan ändra själv på TV:n med knapparna nere till vänster; deras val sparas på den skärmen.</p>
             </div>
             <div className="border-t pt-3 mt-3">
               <p className="text-sm font-medium mb-2">Helguppdateringar</p>
