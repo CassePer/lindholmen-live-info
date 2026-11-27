@@ -1009,8 +1009,27 @@ Deno.serve(async (req) => {
           .map((r: any) => r.menu_data?.restaurantId)
       );
       const missing = (weeklyRest ?? []).map((r: any) => r.id).filter((id: string) => !haveWeekly.has(id));
-      if (missing.length > 0 && isWithinFetchWindow(now, windowStart, windowEnd, windowDisabled).allowed) {
-        weeklyBackfillIds = missing;
+      // Daily restaurants also need today's row; weekly rows alone must not hide them.
+      const { data: dailyRest } = await supabase
+        .from('restaurants').select('id').eq('active', true).eq('weekly_menu', false);
+      const haveToday = new Set(cached.map((r: any) => r.menu_data?.restaurantId));
+      const missingDaily = (dailyRest ?? []).map((r: any) => r.id).filter((id: string) => !haveToday.has(id));
+      if ((missing.length + missingDaily.length) > 0 && isWithinFetchWindow(now, windowStart, windowEnd, windowDisabled).allowed) {
+        // Max one automatic attempt per restaurant and hour, so failed scrapes don't repeat on every visit.
+        const candidates = [...missing, ...missingDaily];
+        const attemptKeys = candidates.map((id) => `lunch_backfill_attempt_${id}`);
+        const { data: attempts } = await supabase.from('app_settings').select('key, value').in('key', attemptKeys);
+        const last = new Map((attempts ?? []).map((a: any) => [a.key, Date.parse(a.value)]));
+        weeklyBackfillIds = candidates.filter((id) => {
+          const t = last.get(`lunch_backfill_attempt_${id}`);
+          return !t || now.getTime() - t >= 60 * 60 * 1000;
+        });
+        if (weeklyBackfillIds.length > 0) {
+          await supabase.from('app_settings').upsert(
+            weeklyBackfillIds.map((id) => ({ key: `lunch_backfill_attempt_${id}`, value: now.toISOString() })),
+            { onConflict: 'key' },
+          );
+        }
       }
     }
 
