@@ -1,5 +1,6 @@
 import robotsParser from "robots-parser";
 import { XMLParser } from "fast-xml-parser";
+import { parseOpheliaWeek, OPHELIA_DAYS } from "../../supabase/functions/_shared/ophelia-menu";
 
 const AGENT = "LindholmenLunchBot";
 const robots = new Map<string, ReturnType<typeof robotsParser>>();
@@ -31,7 +32,15 @@ export async function sourceText(url: string, rss: boolean, weekStart: string): 
   if (!response.ok) throw new Error(`Källan svarade ${response.status}.`);
   const raw = await response.text();
   if (raw.length > 2_000_000) throw new Error("Källan är för stor.");
-  if (!rss) return htmlText(raw);
+  if (!rss) {
+    if (/^(www\.)?restaurangophelia\.se$/.test(new URL(url).hostname)) {
+      const week = parseOpheliaWeek(raw, weekStart);
+      if (!week) throw new Error("Ophelias aktuella veckomeny kunde inte läsas.");
+      const labels = ['Måndag', 'Tisdag', 'Onsdag', 'Torsdag', 'Fredag', 'Hela veckan'];
+      return OPHELIA_DAYS.map((day, i) => `${labels[i]}\n${week[day].map((dish) => dish.name).join('\n')}`).join('\n\n');
+    }
+    return htmlText(raw);
+  }
   const parsed = new XMLParser({ ignoreAttributes: false }).parse(raw);
   const items = parsed.rss?.channel?.item;
   const list = Array.isArray(items) ? items : items ? [items] : [];

@@ -1,5 +1,9 @@
 # Säker drift utan databas
 
+## Ophelias veckomeny
+- [x] Läs alla fem dagarna från sidans offentliga veckodata och aktivera veckomeny; verklig källäsning och sju regressionstester godkända.
+- [ ] Verifiera ny veckomeny genom verklig schemalagd hämtning och visning; väntar på nästa tillåtna vardagsfönster (måndag 07–15).
+
 ## Automatisk Worker-publicering
 - [x] Lägg till GitHub Actions för den separata Worker-tjänsten och dokumentera säker aktivering.
 - [x] Verifiera tester och publiceringsregler: 8 säkerhetstester godkända och actionlint utan fel.

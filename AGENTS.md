@@ -7,4 +7,5 @@
 - The portable scraper and external Worker live outside src and are never imported by client code; Cloud functions remain active during migration and receive independent bug/security fixes.
 - Administrative functions verify short-lived server-signed sessions on every privileged request; browser state alone never authorizes changes.
 - Today's lunch uses current-week cached dishes even outside scraping hours; refreshes retain healthy cache until validated replacements exist.
+- Share Ophelia's JSON-only weekly parser between Cloud and the publishing job, validating the ISO year/week; visible HTML contains only the selected day.
 - Deploy the standalone Worker through a separately gated GitHub Actions environment with concurrency locking and runtime security tests; this keeps deployment credentials out of the client and leaves Cloud migration reversible.

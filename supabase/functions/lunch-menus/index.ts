@@ -1,5 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { allowedSource } from '../_shared/source-policy.ts';
+import { parseOpheliaWeek } from '../_shared/ophelia-menu.ts';
+import robotsParser from 'npm:robots-parser@3.0.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -1206,8 +1208,33 @@ Deno.serve(async (req) => {
               // Reuse this week's cached weekly menu — no scrape, no cache write.
               return { ...weeklyToTodayMenu(cachedWeekly, now, todayKey), _substituted: true };
             }
-            // Collect page text (weekly RSS feed first, then direct HTML, then Firecrawl markdown)
-            const { candidates, screenshot } = await collectPageContent(r.menu_url, firecrawlKey);
+            // Ophelia embeds all weekdays in public flight JSON, not visible page text.
+            let byDay: Record<string, { name: string; tags?: string[] }[]> | null = null;
+            let usedSource = 'none';
+            const isOphelia = allowedSource(r.menu_url) && /^(www\.)?restaurangophelia\.se$/.test(new URL(r.menu_url).hostname);
+            if (isOphelia) {
+              try {
+                const agent = 'LindholmenLunchBot';
+                const robotsUrl = `${new URL(r.menu_url).origin}/robots.txt`;
+                const rules = await fetch(robotsUrl, { redirect: 'error', signal: AbortSignal.timeout(15000), headers: { 'User-Agent': agent } });
+                if (rules.ok || rules.status === 404) {
+                  const robots = robotsParser(robotsUrl, rules.status === 404 ? '' : await rules.text());
+                  if (robots.isAllowed(r.menu_url, agent) !== false) {
+                    const delay = Math.max(2, robots.getCrawlDelay(agent) ?? 0);
+                    if (delay > 60) throw new Error('Källans väntetid är för lång.');
+                    await new Promise((resolve) => setTimeout(resolve, delay * 1000));
+                    const page = await fetch(r.menu_url, { redirect: 'error', signal: AbortSignal.timeout(20000), headers: { 'User-Agent': agent } });
+                    if (page.ok) {
+                      const html = await page.text();
+                      if (html.length <= 2_000_000) byDay = parseOpheliaWeek(html, mondayKey);
+                      if (byDay) usedSource = 'structured';
+                    }
+                  }
+                }
+              } catch { console.warn('Ophelias strukturerade veckomeny kunde inte läsas.'); }
+            }
+            // Never infer a week from the single visible tab if structured data fails.
+            const { candidates, screenshot } = isOphelia ? { candidates: [], screenshot: null } : await collectPageContent(r.menu_url, firecrawlKey);
             const weeklyRssUrl = r.rss_url ? getCompassGroupUrls(r.rss_url)?.weeklyRss : null;
             if (weeklyRssUrl) {
               const rssWeekText = await fetchRssWeeklyText(weeklyRssUrl);
@@ -1215,8 +1242,6 @@ Deno.serve(async (req) => {
                 candidates.unshift({ source: 'weekly-rss', text: rssWeekText });
               }
             }
-            let byDay: Record<string, { name: string; tags?: string[] }[]> | null = null;
-            let usedSource = 'none';
             for (const cand of candidates) {
               console.log(
                 `Weekly source ${r.name}: source=${cand.source}, chars=${cand.text.length}, sample=${
